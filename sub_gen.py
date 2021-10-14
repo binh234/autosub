@@ -65,6 +65,7 @@ class SubGenerator:
                     if num_inferred > self.max_words or token['end'] - prev_end > self.split_duration:
                         write_to_file(self.output_file_handle_dict, infer_text, line_count, (prev_end / 1000, token['start'] / 1000))
                         infer_text = ""
+                        num_inferred = 0
                         prev_end = token['end']
                         line_count += 1
                 
