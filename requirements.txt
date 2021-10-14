@@ -1,0 +1,12 @@
+spleeter
+transformers
+sentencepiece
+django
+faker
+jiwer
+wave
+webrtcvad
+pyctcdecode==0.1.1
+torchaudio
+ffsubsync
+https://github.com/kpu/kenlm/archive/master.zip
