@@ -30,7 +30,7 @@ class ASRModel:
         print("Model loaded successfully in %fs" % (time.time() - start))
         
         # Sanity check
-        x = torch.zeros([1, 10000])
+        x = torch.zeros([1, 10000]).to(self.device)
         with torch.no_grad():
             out = self.model(x).logits
             self.vocab_size = out.shape[-1]
