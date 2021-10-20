@@ -1,7 +1,7 @@
 from transformers import Wav2Vec2ForCTC, Wav2Vec2Processor
-import kenlm
 from pyctcdecode import Alphabet, BeamSearchDecoderCTC, LanguageModel, build_ctcdecoder
 import torch
+import numpy as np
 import time
 import tqdm
 from multiprocessing import Pool
@@ -24,11 +24,12 @@ class ASRModel:
 
         print("Loading model...")
         start = time.time()
-        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        self.device = torch.device(
+            "cuda" if torch.cuda.is_available() else "cpu")
         self.processor = Wav2Vec2Processor.from_pretrained(model_path)
         self.model = Wav2Vec2ForCTC.from_pretrained(model_path).to(self.device)
         print("Model loaded successfully in %fs" % (time.time() - start))
-        
+
         # Sanity check
         x = torch.zeros([1, 10000]).to(self.device)
         with torch.no_grad():
@@ -38,7 +39,6 @@ class ASRModel:
         self.decoder = self.build_lm(self.processor.tokenizer)
         print("Language model loaded successfully in %fs" %
               (time.time() - start))
-
 
     def build_lm(self, tokenizer):
         vocab_dict = tokenizer.get_vocab()
@@ -77,6 +77,8 @@ class ASRModel:
             progress_bar.update(int(end - last))
             last = end
 
+        audio_file.close()
+        
         return [{'start': start,
                  'end': end,
                  'transcript': transcript} for start, end, transcript in result]
@@ -87,11 +89,14 @@ class ASRModel:
         last = 0
         result = []
         for start, end, audio in audio_file.split():
-            transcript, tokens, score = self.transcribe_with_metadata(audio, start)[0]
+            transcript, tokens, score = self.transcribe_with_metadata(audio, start)[
+                0]
             result.append((start, end, transcript.strip(), tokens, score))
 
             progress_bar.update(int(end - last))
             last = end
+        
+        audio_file.close()
 
         return [{'start': start,
                  'end': end,
@@ -101,7 +106,7 @@ class ASRModel:
 
     def transcribe(self, audio):
         if len(audio.shape) == 1:
-            audio = audio
+            audio = audio[np.newaxis, :]
         elif len(audio.shape) > 2:
             raise ValueError(
                 "Expected 2 dimensions input, but got %d dimensions" % len(audio.shape))
@@ -109,19 +114,21 @@ class ASRModel:
         inputs = self.processor(
             [x for x in audio], sampling_rate=16_000, return_tensors="pt", padding=True).to(self.device)
         with torch.no_grad():
-            attention_mask = None if not hasattr(inputs, 'attention_mask') else inputs.attention_mask
+            attention_mask = None if not hasattr(
+                inputs, 'attention_mask') else inputs.attention_mask
             logits = self.model(inputs.input_values,
                                 attention_mask=attention_mask,
                                 ).logits
 
         with Pool() as pool:
-            pred_str = self.decoder.decode_batch(pool=pool, logits_list=logits.cpu().detach().numpy(), beam_width=100)
+            pred_str = self.decoder.decode_batch(
+                pool=pool, logits_list=logits.cpu().detach().numpy(), beam_width=100)
 
         return pred_str
 
     def transcribe_with_metadata(self, audio, start):
         if len(audio.shape) == 1:
-            audio = audio
+            audio = audio[np.newaxis, :]
         elif len(audio.shape) > 2:
             raise ValueError(
                 "Expected 2 dimensions input, but got %d dimensions" % len(audio.shape))
@@ -129,13 +136,15 @@ class ASRModel:
         inputs = self.processor(
             [x for x in audio], sampling_rate=16_000, return_tensors="pt", padding=True).to(self.device)
         with torch.no_grad():
-            attention_mask = None if not hasattr(inputs, 'attention_mask') else inputs.attention_mask
+            attention_mask = None if not hasattr(
+                inputs, 'attention_mask') else inputs.attention_mask
             logits = self.model(inputs.input_values,
                                 attention_mask=attention_mask,
                                 ).logits
 
         with Pool() as pool:
-            beam_batch = self.decoder.decode_beams_batch(pool=pool, logits_list=logits.cpu().detach().numpy(), beam_width=100)
+            beam_batch = self.decoder.decode_beams_batch(
+                pool=pool, logits_list=logits.cpu().detach().numpy(), beam_width=100)
 
         pred_batch = []
         for top_beam in beam_batch:

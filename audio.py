@@ -1,6 +1,7 @@
 from utils import *
 import wave
 
+
 class AudioFile:
     def __init__(self, audio_path, audio_format=DEFAULT_FORMAT):
         super(AudioFile, self).__init__()
@@ -13,7 +14,6 @@ class AudioFile:
 
         assert self.audio_format == audio_format, "Audio format mismatch"
 
-    
     def split(self, aggressiveness=3):
         frames = read_frames_from_file(self.wav_file)
         segments = vad_split(frames, aggressiveness=aggressiveness)
@@ -21,4 +21,6 @@ class AudioFile:
             segment_buffer, time_start, time_end = segment
             samples = pcm_to_np(segment_buffer, self.audio_format)
             yield time_start, time_end, np.squeeze(samples)
-        
+
+    def close(self):
+        self.wav_file.close()
