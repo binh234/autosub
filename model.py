@@ -120,9 +120,8 @@ class ASRModel:
                                 attention_mask=attention_mask,
                                 ).logits
 
-        with Pool() as pool:
-            pred_str = self.decoder.decode_batch(
-                pool=pool, logits_list=logits.cpu().detach().numpy(), beam_width=100)
+        pred_str = [self.decoder.decode(
+            logit.cpu().detach().numpy(), beam_width=100) for logit in logits]
 
         return pred_str
 
@@ -142,17 +141,15 @@ class ASRModel:
                                 attention_mask=attention_mask,
                                 ).logits
 
-        with Pool() as pool:
-            beam_batch = self.decoder.decode_beams_batch(
-                pool=pool, logits_list=logits.cpu().detach().numpy(), beam_width=100)
-
+        beam_batch = [self.decoder.decode_beams(
+            logit.cpu().detach().numpy(), beam_width=100) for logit in logits]
         pred_batch = []
         for top_beam in beam_batch:
             beam = top_beam[0]
             tokens = []
             score = beam[3]
 
-            for w, i in beam[1]:
+            for w, i in beam[2]:
                 tokens.append({
                     'text': w,
                     'start': start + i[0] * STRIDES,

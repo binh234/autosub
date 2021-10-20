@@ -35,12 +35,12 @@ class SubGenerator:
         else:
             raise ValueError("Extension mismatch")
 
-        self.audio_file = AudioFile(self.temp_path)
         self.sub_format = sub_format
         self.output_directory = output_directory
         self.output_file_handle_dict = {}
 
     def create_sub(self):
+        self.audio_file = AudioFile(self.temp_path)
         for format in self.sub_format:
             output_filename = os.path.join(
                 self.output_directory, self.file_name + "." + format)
