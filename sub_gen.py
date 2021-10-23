@@ -5,8 +5,8 @@ from audio import AudioFile
 from utils import extract_audio, convert_audio, write_to_file
 import tqdm
 
-VIDEO_EXT = ['mp4', 'ogg', 'm4v']
-AUDIO_EXT = ['mp3', 'flac', 'wav']
+VIDEO_EXT = ['mp4', 'ogg', 'm4v', 'm4a', 'webm', 'flv', 'amv', 'avi', '']
+AUDIO_EXT = ['mp3', 'flac', 'wav', 'aac', 'm4a', 'weba', 'sdt']
 
 
 class SubGenerator:
