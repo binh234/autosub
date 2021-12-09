@@ -89,10 +89,14 @@ class SubGenerator:
             if trans_dict is not None:
                 if start - trans_dict.get('end', 0) > self.split_threshold or len(trans_dict['tokens']) > self.max_len:
                     final_transcript, final_tokens = self.post_process(trans_dict['tokens'])
-                    line_count = self.write_sub(final_transcript, final_tokens, trans_dict['start'], trans_dict['end'], line_count)
+                    line_count = self.write_sub(
+                        final_transcript, final_tokens, trans_dict['start'], 
+                        trans_dict['end'], line_count, trans_dict['split_points']
+                    )
                     trans_dict = None
                 else:
                     trans_dict['tokens'].extend(tokens)
+                    trans_dict.append(trans_dict['end'])
                     trans_dict['end'] = end
             
             if trans_dict is None:
@@ -100,6 +104,7 @@ class SubGenerator:
                     'tokens': tokens,
                     'start': start,
                     'end': end,
+                    'split_points': [],
                 }
 
             progress_bar.update(int(end - last))
@@ -115,26 +120,38 @@ class SubGenerator:
         if os.path.exists(self.temp_path):
             os.remove(self.temp_path)
     
-    def write_sub(self, transcript, tokens, start, end, line_count):
+    def write_sub(self, transcript, tokens, start, end, line_count, split_points=[]):
+        if split_points is None:
+            split_points = []
+        split_points.append(1e8)
+
         if end - start > self.split_duration:
             infer_text = ""
-            num_inferred = 1
-            prev_end = start
+            num_inferred = 0
+            split_idx = 0
+            prev_start = start
 
             for token in tokens:
-                infer_text += token['text'] + " "
-                num_inferred += 1
-                if num_inferred > self.max_words or token['end'] - prev_end > self.split_duration:
+                if (
+                    num_inferred > self.max_words 
+                    or token['start'] > split_points[split_idx] 
+                    or token['start'] > prev_start + self.split_duration
+                ):
                     write_to_file(self.output_file_handle_dict, infer_text,
-                                    line_count, (prev_end / 1000, token['start'] / 1000))
+                                  line_count, (prev_start / 1000, prev_end / 1000))
+                    line_count += 1
+                    split_idx += 1
                     infer_text = ""
                     num_inferred = 0
-                    prev_end = token['end']
-                    line_count += 1
+                    prev_start = token['start']
+
+                infer_text += token['text'] + " "
+                num_inferred += 1
+                prev_end = token['end']
 
             if infer_text:
                 write_to_file(self.output_file_handle_dict, infer_text,
-                                line_count, (prev_end / 1000, token['start'] / 1000))
+                                line_count, (prev_start / 1000, token['end'] / 1000))
                 line_count += 1
         else:
             write_to_file(self.output_file_handle_dict, transcript,
