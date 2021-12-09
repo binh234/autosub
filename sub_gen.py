@@ -13,9 +13,10 @@ class SubGenerator:
     def __init__(self, 
         file_path, 
         asr_model,
-        gector,
         normalizer,
+        gector=None,
         src_lang='vi', 
+        split_threshold=200,
         split_duration=5000, 
         max_words=12, 
         sub_format=['srt'], 
@@ -30,11 +31,16 @@ class SubGenerator:
         self.max_words = max_words
         self.temp_path = os.path.join("temp", self.file_name + ".wav")
         self.split_duration = split_duration
+        self.split_threshold = split_threshold
         self.src_lang = src_lang
 
         self.model = asr_model
-        self.gector = gector
         self.itn = normalizer
+        self.gector = gector
+        if gector is not None:
+            self.max_len = gector.max_len * 2
+        else:
+            self.max_len = 32
 
         if not os.path.exists("temp"):
             os.makedirs("temp")
@@ -54,8 +60,9 @@ class SubGenerator:
     
     def post_process(self, tokens):
         final_tokens = self.itn.inverse_normalize_with_metadata(tokens, verbose=False)
-        final_batch, _ = self.gector.handle_batch_with_metadata([final_tokens])
-        final_tokens = final_batch[0]
+        if self.gector:
+            final_batch, _ = self.gector.handle_batch_with_metadata([final_tokens])
+            final_tokens = final_batch[0]
         final_transcript = " ".join([token['text'] for token in final_tokens])
 
         return final_transcript, final_tokens
@@ -76,13 +83,31 @@ class SubGenerator:
             total=int(self.audio_file.audio_length * 1000))
         line_count = 1
         last = 0
+        trans_dict = None
         for start, end, audio in self.audio_file.split():
-            transcript, tokens, score = self.model.transcribe_with_metadata(audio, start)[0]
-            transcript, tokens = self.post_process(tokens)
-            line_count = self.write_sub(transcript, tokens, start, end, line_count)
+            _, tokens, _ = self.model.transcribe_with_metadata(audio, start)[0]
+            if trans_dict is not None:
+                if start - trans_dict.get('end', 0) > self.split_threshold or len(trans_dict['tokens']) > self.max_len:
+                    final_transcript, final_tokens = self.post_process(trans_dict['tokens'])
+                    line_count = self.write_sub(final_transcript, final_tokens, start, end, line_count)
+                    trans_dict = None
+                else:
+                    trans_dict['tokens'].extend(tokens)
+                    trans_dict['end'] = end
+            
+            if trans_dict is None:
+                trans_dict = {
+                    'tokens': tokens,
+                    'start': start,
+                    'end': end,
+                }
 
             progress_bar.update(int(end - last))
             last = end
+        
+        if trans_dict is not None:
+            final_transcript, final_tokens = self.post_process(trans_dict['tokens'])
+            line_count = self.write_sub(final_transcript, final_tokens, start, end, line_count)
 
         self.audio_file.close()
         self.close_file()
@@ -93,7 +118,7 @@ class SubGenerator:
     def write_sub(self, transcript, tokens, start, end, line_count):
         if end - start > self.split_duration:
             infer_text = ""
-            num_inferred = 0
+            num_inferred = 1
             prev_end = start
 
             for token in tokens:

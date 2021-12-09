@@ -27,7 +27,7 @@ logger = logging.getLogger(__file__)
 
 class GecBERTModel(object):
     def __init__(self, vocab_path=None, model_paths=None,
-                 weigths=None,
+                 weights=None,
                  device=None,
                  max_len=64,
                  min_len=3,
@@ -45,7 +45,7 @@ class GecBERTModel(object):
                  overlap_size=8,
                  min_words_cut=4
                  ):
-        self.model_weights = list(map(float, weigths)) if weigths else [1] * len(model_paths)
+        self.model_weights = list(map(float, weights)) if weights else [1] * len(model_paths)
         self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu") if device is None else torch.device(device)
         self.max_len = max_len
         self.min_len = min_len
@@ -119,7 +119,7 @@ class GecBERTModel(object):
         for tokens in batch:
             start = len(result)
             num_token = len(tokens)
-            if num_token <= 8:
+            if num_token <= self.overlap_size:
                 result.append(tokens)
 
             for i in range(0, num_token - self.overlap_size, self.stride):
@@ -195,9 +195,9 @@ class GecBERTModel(object):
 
         return start_pos - 1, end_pos - 1, sugg_token_clear, prob
 
-    def _get_embbeder(self, weigths_name, special_tokens_fix):
+    def _get_embbeder(self, weights_name, special_tokens_fix):
         embedders = {'bert': PretrainedBertEmbedder(
-            pretrained_model=weigths_name,
+            pretrained_model=weights_name,
             requires_grad=False,
             top_layer_only=True,
             special_tokens_fix=special_tokens_fix)
@@ -278,15 +278,14 @@ class GecBERTModel(object):
         return final_batch, new_pred_ids, total_updated
 
     def postprocess_batch(self, batch, all_probabilities, all_idxs,
-                          error_probs,
-                          max_len=50):
+                          error_probs):
         all_results = []
         noop_index = self.vocab.get_token_index("$KEEP", "labels")
         for tokens, probabilities, idxs, error_prob in zip(batch,
                                                            all_probabilities,
                                                            all_idxs,
                                                            error_probs):
-            length = min(len(tokens), max_len)
+            length = min(len(tokens), self.max_len)
             edits = []
 
             # skip whole sentences if there no errors
