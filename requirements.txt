@@ -5,6 +5,7 @@ faker
 ffsubsync
 jiwer
 numpy==1.19.5
+overrides==4.1.2
 pyctcdecode==0.2.0
 pynini
 python-Levenshtein==0.12.1
