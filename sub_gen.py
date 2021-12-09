@@ -96,7 +96,7 @@ class SubGenerator:
                     trans_dict = None
                 else:
                     trans_dict['tokens'].extend(tokens)
-                    trans_dict.append(trans_dict['end'])
+                    trans_dict['split_points'].append(trans_dict['end'])
                     trans_dict['end'] = end
             
             if trans_dict is None:
@@ -112,7 +112,10 @@ class SubGenerator:
         
         if trans_dict is not None:
             final_transcript, final_tokens = self.post_process(trans_dict['tokens'])
-            line_count = self.write_sub(final_transcript, final_tokens, start, end, line_count)
+            line_count = self.write_sub(
+                            final_transcript, final_tokens, trans_dict['start'], 
+                            trans_dict['end'], line_count, trans_dict['split_points']
+                        )
 
         self.audio_file.close()
         self.close_file()
@@ -140,10 +143,12 @@ class SubGenerator:
                     write_to_file(self.output_file_handle_dict, infer_text,
                                   line_count, (prev_start / 1000, prev_end / 1000))
                     line_count += 1
-                    split_idx += 1
                     infer_text = ""
                     num_inferred = 0
                     prev_start = token['start']
+
+                    if token['start'] > split_points[split_idx]:
+                        split_idx += 1
 
                 infer_text += token['text'] + " "
                 num_inferred += 1
