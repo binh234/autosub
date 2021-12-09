@@ -13,6 +13,7 @@ class SubGenerator:
     def __init__(self, 
         file_path, 
         asr_model,
+        gector,
         normalizer,
         src_lang='vi', 
         split_duration=5000, 
@@ -32,6 +33,7 @@ class SubGenerator:
         self.src_lang = src_lang
 
         self.model = asr_model
+        self.gector = gector
         self.itn = normalizer
 
         if not os.path.exists("temp"):
@@ -52,6 +54,8 @@ class SubGenerator:
     
     def post_process(self, tokens):
         final_tokens = self.itn.inverse_normalize_with_metadata(tokens, verbose=False)
+        final_batch, _ = self.gector.handle_batch_with_metadata([final_tokens])
+        final_tokens = final_batch[0]
         final_transcript = " ".join([token['text'] for token in final_tokens])
 
         return final_transcript, final_tokens

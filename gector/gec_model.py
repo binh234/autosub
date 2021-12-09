@@ -28,7 +28,8 @@ logger = logging.getLogger(__file__)
 class GecBERTModel(object):
     def __init__(self, vocab_path=None, model_paths=None,
                  weigths=None,
-                 max_len=50,
+                 device=None,
+                 max_len=64,
                  min_len=3,
                  lowercase_tokens=False,
                  log=False,
@@ -45,7 +46,7 @@ class GecBERTModel(object):
                  min_words_cut=4
                  ):
         self.model_weights = list(map(float, weigths)) if weigths else [1] * len(model_paths)
-        self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+        self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu") if device is None else torch.device(device)
         self.max_len = max_len
         self.min_len = min_len
         self.lowercase_tokens = lowercase_tokens
@@ -73,11 +74,7 @@ class GecBERTModel(object):
                                text_field_embedder=self._get_embbeder(weights_name, special_tokens_fix),
                                confidence=self.confidence
                                ).to(self.device)
-            if torch.cuda.is_available():
-                model.load_state_dict(torch.load(model_path))
-            else:
-                model.load_state_dict(torch.load(model_path,
-                                                 map_location=torch.device('cpu')))
+            model.load_state_dict(torch.load(model_path))
             model.eval()
             self.models.append(model)
 
@@ -95,12 +92,11 @@ class GecBERTModel(object):
             filenames = [input_path]
         for model_path in filenames:
             try:
-                if torch.cuda.is_available():
-                    loaded_model = torch.load(model_path)
-                else:
-                    loaded_model = torch.load(model_path,
-                                              map_location=lambda storage,
-                                                                  loc: storage)
+                loaded_model = torch.load(model_path)
+                # else:
+                #     loaded_model = torch.load(model_path,
+                #                               map_location=lambda storage,
+                #                                                   loc: storage)
             except:
                 print(f"{model_path} is not valid model", file=sys.stderr)
             own_state = self.model.state_dict()
@@ -166,7 +162,7 @@ class GecBERTModel(object):
         t11 = time()
         predictions = []
         for batch, model in zip(batches, self.models):
-            batch = util.move_to_device(batch.as_tensor_dict(), 0 if torch.cuda.is_available() else -1)
+            batch = util.move_to_device(batch.as_tensor_dict(), 0 if self.device=="cuda" else -1)
             with torch.no_grad():
                 prediction = model.forward(**batch)
             predictions.append(prediction)
@@ -377,9 +373,10 @@ class GecBERTModel(object):
         final_batch_meta = []
 
         for batch, batch_meta in zip(final_batch, full_batch_meta):
+            batch = batch.split()
             final_batch_meta.append([{
                 'text': batch[i],
                 'start': batch_meta[i]['start'],
                 'end': batch_meta[i]['end'],
             } for i in range(len(batch))])
-        return final_batch, total_updates
+        return final_batch_meta, total_updates

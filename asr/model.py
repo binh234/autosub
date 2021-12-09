@@ -121,7 +121,7 @@ class ASRModel:
                                 ).logits
 
         pred_str = [self.decoder.decode(
-            logit.cpu().detach().numpy(), beam_width=100) for logit in logits]
+            logit.detach().cpu().numpy(), beam_width=100) for logit in logits]
 
         return pred_str
 
@@ -142,7 +142,7 @@ class ASRModel:
                                 ).logits
 
         beam_batch = [self.decoder.decode_beams(
-            logit.cpu().detach().numpy(), beam_width=100) for logit in logits]
+            logit.detach().cpu().numpy(), beam_width=100) for logit in logits]
         pred_batch = []
         for top_beam in beam_batch:
             beam = top_beam[0]

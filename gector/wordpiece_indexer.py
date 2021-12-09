@@ -5,7 +5,7 @@ from typing import Dict, List, Callable
 
 from allennlp.common.util import pad_sequence_to_length
 from allennlp.data.token_indexers.token_indexer import TokenIndexer
-from allennlp.data.tokenizers.token import Token
+from allennlp.data.tokenizers import Token
 from allennlp.data.vocabulary import Vocabulary
 from overrides import overrides
 from transformers import AutoTokenizer

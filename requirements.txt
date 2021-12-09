@@ -1,13 +1,13 @@
-allennlp
+allennlp==0.8.4
 argparse
 django
 faker
 ffsubsync
 jiwer
-numpy
+numpy==1.19.5
 pyctcdecode==0.2.0
 python-Levenshtein==0.12.1
-scikit-learn
+scikit-learn==0.20.0
 torch==1.9.1
 torchaudio==0.9.1
 transformers==4.12.5
