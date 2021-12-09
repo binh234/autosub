@@ -13,20 +13,20 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from nemo_text_processing.inverse_text_normalization.vi.verbalizers.address import AddressFst
-from nemo_text_processing.inverse_text_normalization.vi.verbalizers.cardinal import CardinalFst
-from nemo_text_processing.inverse_text_normalization.vi.verbalizers.date import DateFst
-from nemo_text_processing.inverse_text_normalization.vi.verbalizers.decimal import DecimalFst
-from nemo_text_processing.inverse_text_normalization.vi.verbalizers.fraction import FractionFst
-from nemo_text_processing.inverse_text_normalization.vi.verbalizers.electronic import ElectronicFst
-from nemo_text_processing.inverse_text_normalization.vi.verbalizers.math import MathFst
-from nemo_text_processing.inverse_text_normalization.vi.verbalizers.measure import MeasureFst
-from nemo_text_processing.inverse_text_normalization.vi.verbalizers.money import MoneyFst
-from nemo_text_processing.inverse_text_normalization.vi.verbalizers.ordinal import OrdinalFst
-from nemo_text_processing.inverse_text_normalization.vi.verbalizers.telephone import TelephoneFst
-from nemo_text_processing.inverse_text_normalization.vi.verbalizers.time import TimeFst
-from nemo_text_processing.inverse_text_normalization.vi.verbalizers.whitelist import WhiteListFst
-from nemo_text_processing.inverse_text_normalization.vi.graph_utils import GraphFst
+from text_processing.vi.verbalizers.address import AddressFst
+from text_processing.vi.verbalizers.cardinal import CardinalFst
+from text_processing.vi.verbalizers.date import DateFst
+from text_processing.vi.verbalizers.decimal import DecimalFst
+from text_processing.vi.verbalizers.fraction import FractionFst
+from text_processing.vi.verbalizers.electronic import ElectronicFst
+from text_processing.vi.verbalizers.math import MathFst
+from text_processing.vi.verbalizers.measure import MeasureFst
+from text_processing.vi.verbalizers.money import MoneyFst
+from text_processing.vi.verbalizers.ordinal import OrdinalFst
+from text_processing.vi.verbalizers.telephone import TelephoneFst
+from text_processing.vi.verbalizers.time import TimeFst
+from text_processing.vi.verbalizers.whitelist import WhiteListFst
+from text_processing.vi.graph_utils import GraphFst
 
 
 class VerbalizeFst(GraphFst):

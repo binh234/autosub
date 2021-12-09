@@ -2,6 +2,7 @@
 import logging
 import os
 import sys
+import re
 from time import time
 
 import torch
@@ -38,6 +39,10 @@ class GecBERTModel(object):
                  min_error_probability=0.0,
                  confidence=0,
                  resolve_cycles=False,
+                 split_chunk=False,
+                 chunk_size=32,
+                 overlap_size=8,
+                 min_words_cut=4
                  ):
         self.model_weights = list(map(float, weigths)) if weigths else [1] * len(model_paths)
         self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
@@ -50,6 +55,11 @@ class GecBERTModel(object):
         self.iterations = iterations
         self.confidence = confidence
         self.resolve_cycles = resolve_cycles
+        self.split_chunk = split_chunk
+        self.chunk_size = chunk_size
+        self.overlap_size = overlap_size
+        self.min_words_cut = min_words_cut
+        self.stride = chunk_size - overlap_size
         # set training parameters and operations
 
         self.indexers = []
@@ -105,6 +115,52 @@ class GecBERTModel(object):
                 except RuntimeError:
                     continue
         print("Model is restored", file=sys.stderr)
+    
+    def split_chunks(self, batch):
+        # return batch pairs of indices
+        result = []
+        indices = []
+        for tokens in batch:
+            start = len(result)
+            num_token = len(tokens)
+            if num_token <= 8:
+                result.append(tokens)
+
+            for i in range(0, num_token - self.overlap_size, self.stride):
+                result.append(tokens[i: i + self.chunk_size])
+
+            indices.append((start, len(result)))
+
+        return result, indices
+    
+    def merge_chunk(self, batch, indices):
+        head = self.overlap_size - self.min_words_cut
+        tail = self.min_words_cut
+        result = []
+        for (start, end) in indices:
+            tokens = []
+            for i in range(start, end):
+                try:
+                    sub_text = batch[i].strip()
+                    sub_text = re.sub(r'([\.\,\?\:]\s+)+', r'\1', sub_text)
+                    sub_text = re.sub(r'\s+([\.\,\?\:])', r'\1', sub_text)
+                    sub_tokens = sub_text.split()
+                    if i == start:
+                        if i == end - 1:
+                            tokens = sub_tokens
+                        else:
+                            tokens.extend(sub_tokens[:-tail])
+                    elif i == end - 1:
+                        tokens.extend(sub_tokens[head:])
+                    else:
+                        tokens.extend(sub_tokens[head:-tail])
+                except Exception as e:
+                    print(e)
+
+            text = " ".join(tokens)
+            result.append(text)
+
+        return result
 
     def predict(self, batches):
         t11 = time()
@@ -272,6 +328,8 @@ class GecBERTModel(object):
         """
         Handle batch of requests.
         """
+        if self.split_chunk:
+            full_batch, indices = self.split_chunk(full_batch)
         final_batch = full_batch[:]
         batch_size = len(full_batch)
         prev_preds_dict = {i: [final_batch[i]] for i in range(len(final_batch))}
@@ -301,5 +359,27 @@ class GecBERTModel(object):
 
             if not pred_ids:
                 break
+        
+        if self.split_chunk:
+            final_batch = self.merge_chunk(final_batch, indices)
+        else:
+            final_batch = [" ".join(x) for x in final_batch]
+            final_batch = [re.sub(r'\s+([\.\,\?\:])', r'\1', x) for x in final_batch]
 
+        return final_batch, total_updates
+
+    def handle_batch_with_metadata(self, full_batch_meta):
+        """
+        Handle batch of requests.
+        """
+        full_batch = [[token['text'] for token in batch] for batch in full_batch_meta]
+        final_batch, total_updates = self.handle_batch(full_batch)
+        final_batch_meta = []
+
+        for batch, batch_meta in zip(final_batch, full_batch_meta):
+            final_batch_meta.append([{
+                'text': batch[i],
+                'start': batch_meta[i]['start'],
+                'end': batch_meta[i]['end'],
+            } for i in range(len(batch))])
         return final_batch, total_updates

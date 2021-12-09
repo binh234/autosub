@@ -1,14 +1,17 @@
 import os
 import argparse
 
-from asr.model import ASRModel
 from sub_gen import SubGenerator
+from asr.model import ASRModel
+from text_processing.inverse_normalize import InverseNormalizer
 
-file_path = "sample/audio_wind.mp3"
+file_path = "sample/audio_num.mp3"
+
+normalizer = InverseNormalizer("vi")
 
 model = ASRModel("pretrain/base", None)
 
-gen = SubGenerator(file_path, model)
+gen = SubGenerator(file_path, model, normalizer)
 gen.create_sub()
 # gen.sync_sub()
 # gen.add_sub_to_video()

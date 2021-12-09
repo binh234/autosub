@@ -11,10 +11,12 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import Levenshtein
 
 from argparse import ArgumentParser
 from time import perf_counter
 from typing import List
+from difflib import SequenceMatcher
 
 from text_processing.normalize import Normalizer
 from text_processing.token_parser import TokenParser
@@ -56,7 +58,7 @@ class InverseNormalizer(Normalizer):
         """
         return self.normalize_list(texts=texts, verbose=verbose)
 
-    def inverse_normalize(self, text: str, verbose: bool) -> str:
+    def inverse_normalize(self, text: str, verbose: bool=False) -> str:
         """
         Main function. Inverse normalizes tokens from spoken to written form
             e.g. twelve kilograms -> 12 kg
@@ -68,7 +70,66 @@ class InverseNormalizer(Normalizer):
         Returns: written form
         """
         return self.normalize(text=text, verbose=verbose)
+    
+    def inverse_normalize_list_with_metadata(self, text_metas: List, verbose=False) -> List[str]:
+        """
+        NeMo inverse text normalizer 
 
+        Args:
+            texts: list of input strings
+            verbose: whether to print intermediate meta information
+
+        Returns converted list of input strings
+        """
+        res = []
+        for input in text_metas:
+            try:
+                text = self.inverse_normalize_with_metadata(input, verbose=verbose)
+            except:
+                print(input)
+                raise Exception
+            res.append(text)
+        return res
+    
+    def inverse_normalize_with_metadata(self, text_meta: List, verbose: bool=False):
+        """
+        Main function. Inverse normalizes tokens from spoken to written form
+            e.g. twelve kilograms -> 12 kg
+
+        Args:
+            text_meta: list of tokens include text, start time, end time and score for each token
+            verbose: whether to print intermediate meta information
+
+        Returns: written form
+        """
+        text = " ".join([token['text'] for token in text_meta])
+        normalize_text = self.inverse_normalize(text, verbose=verbose)
+        normalize_text_meta = []
+
+        source_tokens = text.split()
+        target_tokens = normalize_text.split()
+        matcher = SequenceMatcher(None, source_tokens, target_tokens)
+        diffs = list(matcher.get_opcodes())
+
+        for diff in diffs:
+            tag, i1, i2, j1, j2 = diff
+
+            if tag == "equal":
+                normalize_text_meta.extend(text_meta[i1:i2])
+            else:
+                start = text_meta[i1]['start']
+                end = text_meta[i2 - 1]['end']
+                num_target_tokens = j2 - j1
+                time_step = (end - start) / num_target_tokens
+                for c in range(num_target_tokens):
+                    normalize_text_meta.append({
+                        'text': target_tokens[j1 + c],
+                        'start': start,
+                        'end': start + time_step,
+                    })
+                    start += time_step
+        
+        return normalize_text_meta
 
 def parse_args():
     parser = ArgumentParser()
