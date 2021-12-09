@@ -89,7 +89,7 @@ class SubGenerator:
             if trans_dict is not None:
                 if start - trans_dict.get('end', 0) > self.split_threshold or len(trans_dict['tokens']) > self.max_len:
                     final_transcript, final_tokens = self.post_process(trans_dict['tokens'])
-                    line_count = self.write_sub(final_transcript, final_tokens, start, end, line_count)
+                    line_count = self.write_sub(final_transcript, final_tokens, trans_dict['start'], trans_dict['end'], line_count)
                     trans_dict = None
                 else:
                     trans_dict['tokens'].extend(tokens)

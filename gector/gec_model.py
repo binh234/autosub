@@ -46,7 +46,7 @@ class GecBERTModel(object):
                  min_words_cut=4
                  ):
         self.model_weights = list(map(float, weights)) if weights else [1] * len(model_paths)
-        self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu") if device is None else torch.device(device)
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu") if device is None else torch.device(device)
         self.max_len = max_len
         self.min_len = min_len
         self.lowercase_tokens = lowercase_tokens
@@ -129,7 +129,7 @@ class GecBERTModel(object):
 
         return result, indices
     
-    def merge_chunk(self, batch, indices):
+    def merge_chunks(self, batch, indices):
         head = self.overlap_size - self.min_words_cut
         tail = self.min_words_cut
         result = []
@@ -162,7 +162,7 @@ class GecBERTModel(object):
         t11 = time()
         predictions = []
         for batch, model in zip(batches, self.models):
-            batch = util.move_to_device(batch.as_tensor_dict(), 0 if self.device=="cuda" else -1)
+            batch = util.move_to_device(batch.as_tensor_dict(), 0 if self.device!=torch.device("cpu") else -1)
             with torch.no_grad():
                 prediction = model.forward(**batch)
             predictions.append(prediction)
@@ -324,7 +324,7 @@ class GecBERTModel(object):
         Handle batch of requests.
         """
         if self.split_chunk:
-            full_batch, indices = self.split_chunk(full_batch)
+            full_batch, indices = self.split_chunks(full_batch)
         final_batch = full_batch[:]
         batch_size = len(full_batch)
         prev_preds_dict = {i: [final_batch[i]] for i in range(len(final_batch))}
@@ -354,11 +354,10 @@ class GecBERTModel(object):
 
             if not pred_ids:
                 break
-        
+        final_batch = [" ".join(x) for x in final_batch]
         if self.split_chunk:
-            final_batch = self.merge_chunk(final_batch, indices)
+            final_batch = self.merge_chunks(final_batch, indices)
         else:
-            final_batch = [" ".join(x) for x in final_batch]
             final_batch = [re.sub(r'\s+([\.\,\?\:])', r'\1', x) for x in final_batch]
 
         return final_batch, total_updates
