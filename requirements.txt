@@ -6,6 +6,7 @@ ffsubsync
 jiwer
 numpy==1.19.5
 pyctcdecode==0.2.0
+pynini
 python-Levenshtein==0.12.1
 scikit-learn==0.20.0
 torch==1.9.1
