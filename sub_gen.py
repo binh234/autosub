@@ -1,11 +1,11 @@
 import os
 import subprocess
 
-from audio import AudioFile
+from asr.audio import AudioFile
 from utils import extract_audio, convert_audio, write_to_file
 import tqdm
 
-VIDEO_EXT = ['mp4', 'ogg', 'm4v', 'm4a', 'webm', 'flv', 'amv', 'avi', '']
+VIDEO_EXT = ['mp4', 'ogg', 'm4v', 'm4a', 'webm', 'flv', 'amv', 'avi']
 AUDIO_EXT = ['mp3', 'flac', 'wav', 'aac', 'm4a', 'weba', 'sdt']
 
 
@@ -57,8 +57,7 @@ class SubGenerator:
         line_count = 1
         last = 0
         for start, end, audio in self.audio_file.split():
-            transcript, tokens, score = self.model.transcribe_with_metadata(audio, start)[
-                0]
+            transcript, tokens, score = self.model.transcribe_with_metadata(audio, start)[0]
 
             if end - start > self.split_duration:
                 infer_text = ""

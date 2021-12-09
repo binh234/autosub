@@ -7,7 +7,7 @@ import tqdm
 from multiprocessing import Pool
 import warnings
 
-from audio import AudioFile
+from asr.audio import AudioFile
 
 WINDOW_SIZE = 25
 STRIDES = 20
