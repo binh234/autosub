@@ -17,3 +17,4 @@ sentencepiece
 wave
 webrtcvad
 https://github.com/kpu/kenlm/archive/master.zip
+git+git://github.com/speechbrain/speechbrain.git@develop

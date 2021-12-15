@@ -128,11 +128,15 @@ class SubGenerator:
             split_points = []
         split_points.append(1e8)
 
+        if len(tokens) == 0:
+            return line_count
+
         if end - start > self.split_duration:
             infer_text = ""
             num_inferred = 0
             split_idx = 0
-            prev_start = start
+            prev_start = tokens[0]['start']
+            prev_end = None
 
             for token in tokens:
                 if (
@@ -140,12 +144,13 @@ class SubGenerator:
                     or token['start'] > split_points[split_idx] 
                     or token['start'] > prev_start + self.split_duration
                 ):
-                    write_to_file(self.output_file_handle_dict, infer_text,
-                                  line_count, (prev_start / 1000, prev_end / 1000))
-                    line_count += 1
-                    infer_text = ""
-                    num_inferred = 0
-                    prev_start = token['start']
+                    if prev_end is not None:
+                        write_to_file(self.output_file_handle_dict, infer_text,
+                                    line_count, (prev_start / 1000, prev_end / 1000))
+                        line_count += 1
+                        infer_text = ""
+                        num_inferred = 0
+                        prev_start = token['start']
 
                     if token['start'] > split_points[split_idx]:
                         split_idx += 1
