@@ -36,14 +36,15 @@ class GecBERTModel(object):
                  iterations=3,
                  model_name='roberta',
                  special_tokens_fix=1,
-                 is_ensemble=True,
+                 is_ensemble=False,
                  min_error_probability=0.0,
                  confidence=0,
                  resolve_cycles=False,
                  split_chunk=False,
-                 chunk_size=32,
-                 overlap_size=8,
-                 min_words_cut=4
+                 chunk_size=48,
+                 overlap_size=12,
+                 min_words_cut=6,
+                 punc_dict={':', ".", ",", "?"},
                  ):
         self.model_weights = list(map(float, weights)) if weights else [1] * len(model_paths)
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu") if device is None else torch.device(device)
@@ -56,11 +57,15 @@ class GecBERTModel(object):
         self.iterations = iterations
         self.confidence = confidence
         self.resolve_cycles = resolve_cycles
+
+        assert chunk_size > 0 and chunk_size // 2 >= overlap_size, \
+            "Chunk merging required overlap size must be smaller than half of chunk size"
         self.split_chunk = split_chunk
         self.chunk_size = chunk_size
         self.overlap_size = overlap_size
         self.min_words_cut = min_words_cut
         self.stride = chunk_size - overlap_size
+        self.punc_dict = punc_dict
         # set training parameters and operations
 
         self.indexers = []
@@ -119,43 +124,88 @@ class GecBERTModel(object):
         for tokens in batch:
             start = len(result)
             num_token = len(tokens)
-            if num_token <= self.overlap_size:
+            if num_token <= self.chunk_size:
                 result.append(tokens)
-
-            for i in range(0, num_token - self.overlap_size, self.stride):
-                result.append(tokens[i: i + self.chunk_size])
+            elif num_token > self.chunk_size and num_token < (self.chunk_size * 2 - self.overlap_size):
+                split_idx = (self.num_token + self.overlap_size + 1) // 2
+                result.append(tokens[:split_idx])
+                result.append(tokens[split_idx - self.overlap_size:])
+            else:
+                for i in range(0, num_token - self.overlap_size, self.stride):
+                    result.append(tokens[i: i + self.chunk_size])
 
             indices.append((start, len(result)))
 
         return result, indices
     
-    def merge_chunks(self, batch, indices):
-        head = self.overlap_size - self.min_words_cut
-        tail = self.min_words_cut
+    def check_alnum(self, s):
+        if len(s) < 2:
+            return False
+        return not (s.isalpha() or s.isdigit())
+
+    def apply_chunk_merging(self, tokens, next_tokens):
+        num_words = 0
+        num_words_cut = 0
+        head_idx = tail_idx = 0
+
+        # Return next tokens if current tokens list is empty
+        if not tokens:
+            return next_tokens
+        
+        for token in tokens[::-1]:
+            if token not in self.punc_dict:
+                if self.check_alnum(token):
+                    clean_token = re.sub(r"(\d)([a-zA-Z])", r"\1 \2", token)
+                    clean_token = re.sub(r"([a-zA-Z])(\d)", r"\1 \2", clean_token)
+                    word_len = len(clean_token.split())
+                else:
+                    word_len = 1
+                
+                if num_words_cut + word_len > self.min_words_cut:
+                    break
+                
+                num_words_cut += word_len
+            tail_idx += 1
+        
+        tokens = tokens[:-tail_idx]
+        
+        num_words_pass = self.overlap_size - num_words_cut
+        for token in next_tokens:
+            if token not in self.punc_dict:
+                sub_tokens = []
+                if self.check_alnum(token):
+                    clean_token = re.sub(r"(\d)([a-zA-Z])", r"\1 \2", token)
+                    clean_token = re.sub(r"([a-zA-Z])(\d)", r"\1 \2", clean_token)
+                    sub_tokens = clean_token.split()
+                    num_words += len(sub_tokens)
+                else:
+                    num_words += 1
+                
+                if num_words >= num_words_pass:
+                    head_idx += 1
+                    if num_words > num_words_pass:
+                        idx = num_words - num_words_pass
+                        tokens.append("".join(sub_tokens[len(sub_tokens) - idx:]))
+                    break
+
+            head_idx += 1
+
+        tokens.extend(next_tokens[head_idx:])
+        return tokens
+    
+    def merge_chunks(self, batch):
         result = []
-        for (start, end) in indices:
-            tokens = []
-            for i in range(start, end):
+        if len(batch) == 1 or self.overlap_size == 0:
+            for sub_tokens in batch:
+                result.extend(sub_tokens)
+        else:
+            for _, sub_tokens in enumerate(batch):
                 try:
-                    sub_text = batch[i].strip()
-                    sub_text = re.sub(r'([\.\,\?\:]\s+)+', r'\1', sub_text)
-                    sub_text = re.sub(r'\s+([\.\,\?\:])', r'\1', sub_text)
-                    sub_tokens = sub_text.split()
-                    if i == start:
-                        if i == end - 1:
-                            tokens = sub_tokens
-                        else:
-                            tokens.extend(sub_tokens[:-tail])
-                    elif i == end - 1:
-                        tokens.extend(sub_tokens[head:])
-                    else:
-                        tokens.extend(sub_tokens[head:-tail])
+                    result = self.apply_chunk_merging(result, sub_tokens)
                 except Exception as e:
                     print(e)
 
-            text = " ".join(tokens)
-            result.append(text)
-
+        result = " ".join(result)
         return result
 
     def predict(self, batches):
@@ -325,6 +375,8 @@ class GecBERTModel(object):
         """
         if self.split_chunk:
             full_batch, indices = self.split_chunks(full_batch)
+        else:
+            indices = None
         final_batch = full_batch[:]
         batch_size = len(full_batch)
         prev_preds_dict = {i: [final_batch[i]] for i in range(len(final_batch))}
@@ -354,11 +406,14 @@ class GecBERTModel(object):
 
             if not pred_ids:
                 break
-        final_batch = [" ".join(x) for x in final_batch]
         if self.split_chunk:
-            final_batch = self.merge_chunks(final_batch, indices)
+            final_batch = [
+                self.merge_chunks(final_batch[start:end]) 
+                for (start, end) in indices
+            ]
         else:
-            final_batch = [re.sub(r'\s+([\.\,\?\:])', r'\1', x) for x in final_batch]
+            final_batch = [" ".join(x) for x in final_batch]
+        final_batch = [re.sub(r'\s+([\.\,\?\:])', r'\1', x) for x in final_batch]
 
         return final_batch, total_updates
 

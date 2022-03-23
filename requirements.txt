@@ -12,9 +12,9 @@ python-Levenshtein==0.12.1
 scikit-learn==0.20.0
 torch==1.9.1
 torchaudio==0.9.1
-transformers==4.12.5
+transformers==4.15.0
 sentencepiece
+speechbrain==0.5.11
 wave
 webrtcvad
 https://github.com/kpu/kenlm/archive/master.zip
-git+git://github.com/speechbrain/speechbrain.git@develop
