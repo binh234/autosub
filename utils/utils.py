@@ -1,9 +1,10 @@
-import os
 import collections
-import subprocess
-from collections import namedtuple
-import numpy as np
 import datetime
+import numpy as np
+import os
+import subprocess
+import tempfile
+from collections import namedtuple
 
 AudioFormat = namedtuple('AudioFormat', 'rate channels width')
 
@@ -11,13 +12,13 @@ DEFAULT_RATE = 16000
 DEFAULT_CHANNELS = 1
 DEFAULT_WIDTH = 2
 DEFAULT_FORMAT = AudioFormat(DEFAULT_RATE, DEFAULT_CHANNELS, DEFAULT_WIDTH)
-
+DEFAULT_TEMP_DIR = tempfile.mkdtemp()
 
 def extract_audio(video_path, dst_path, format=DEFAULT_FORMAT):
     """
     Extracts audio from video file
     """
-    cmd = f'ffmpeg -loglevel quiet -i "{video_path}" -y -hide_banner -acodec pcm_s16le -ac {format.channels} -ar {format.rate} -vn {dst_path} '
+    cmd = f'ffmpeg -loglevel quiet -i "{video_path}" -y -hide_banner -ac {format.channels} -ar {format.rate} -vn {dst_path} '
     # print(cmd)
     subprocess.call(cmd, shell=True)
 
@@ -28,7 +29,7 @@ def convert_audio(audio_path, dst_path, format=DEFAULT_FORMAT):
     """
     Convert audio file to format
     """
-    cmd = f'ffmpeg -loglevel quiet -i "{audio_path}" -y -hide_banner -acodec pcm_s16le -ac {format.channels} -ar {format.rate} {dst_path}'
+    cmd = f'ffmpeg -loglevel quiet -i "{audio_path}" -y -hide_banner -ac {format.channels} -ar {format.rate} {dst_path}'
     # print(cmd)
     subprocess.call(cmd, shell=True)
 
@@ -60,7 +61,7 @@ def pcm_to_np(pcm_data, audio_format=DEFAULT_FORMAT):
     Converts PCM data (e.g. read from a wavfile) into a mono numpy column vector
     with values in the range [0.0, 1.0].
     """
-    # Handles both mono and stero audio
+    # Handles both mono and stereo audio
     dtype = get_dtype(audio_format)
     samples = np.frombuffer(pcm_data, dtype=dtype)
 
@@ -142,7 +143,7 @@ def vad_split(audio_frames,
                 voiced_frames = []
     if len(voiced_frames) > 0:
         yield b''.join(voiced_frames), \
-              frame_duration_ms * (frame_index - len(voiced_frames)), \
+              frame_duration_ms * max(0, frame_index - len(voiced_frames)), \
               frame_duration_ms * (frame_index + 1)
 
 

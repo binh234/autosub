@@ -49,10 +49,17 @@ def get_quantity(decimal: 'pynini.FstLike', cardinal_up_to_hundred: 'pynini.FstL
     graph_four = pynini.cross("tư", "4")
     graph_one = pynini.cross("mốt", "1")
     graph_half = pynini.cross("rưỡi", "5")
+    last_digit_exception = pynini.project(pynini.cross("năm", "5"), 'input')
+    last_digit = pynini.union(
+        (pynini.project(graph_digit, "input") - last_digit_exception.arcsort()) @ graph_digit,
+        graph_one,
+        graph_four,
+        graph_half
+    )
     optional_fraction_graph = pynini.closure(
         delete_extra_space
         + pynutil.insert("fractional_part: \"")
-        + (graph_digit| graph_half | graph_one | graph_four)
+        + (last_digit | graph_half | graph_one | graph_four)
         + pynutil.insert("\""),
         0,
         1

@@ -80,7 +80,9 @@ class MathFst(GraphFst):
                 + delete_extra_space, 1
             )
             + optional_graph_negative
-            + alpha_num)
+            + alpha_num
+            + optional_graph_power
+        )
 
         graph = pynutil.insert("equation: \"") + graph_equation + pynutil.insert("\"")
         final_graph = self.add_tokens(graph)

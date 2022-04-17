@@ -1,49 +1,22 @@
 import os
 import subprocess
 import tqdm
+import tempfile
 
 from asr.audio import AudioFile
-from utils import extract_audio, convert_audio, write_to_file
+from utils import extract_audio, convert_audio, write_to_file, DEFAULT_TEMP_DIR
 
 VIDEO_EXT = ['mp4', 'ogg', 'm4v', 'm4a', 'webm', 'flv', 'amv', 'avi']
 AUDIO_EXT = ['mp3', 'flac', 'wav', 'aac', 'm4a', 'weba', 'sdt']
 
 
-class SubGenerator:
-    def __init__(self, 
-        file_path, 
-        asr_model,
-        normalizer,
-        gector=None,
-        src_lang='vi', 
-        split_threshold=200,
-        split_duration=5000, 
-        max_words=12, 
-        sub_format=['srt'], 
-        output_directory="./temp"):
-        super(SubGenerator, self).__init__()
-
-        if not os.path.exists(file_path):
-            raise ValueError("File does not exist: %s" % file_path)
-
+class FileGenObject(object):
+    def __init__(self, file_path, sub_format=['srt'], output_directory="./temp", temp_dir=DEFAULT_TEMP_DIR):
         self.file_path = file_path
-        self.file_name, self.file_ext = os.path.split(file_path)[-1].split(".")
-        self.max_words = max_words
-        self.temp_path = os.path.join("temp", self.file_name + ".wav")
-        self.split_duration = split_duration
-        self.split_threshold = split_threshold
-        self.src_lang = src_lang
-
-        self.model = asr_model
-        self.itn = normalizer
-        self.gector = gector
-        if gector is not None:
-            self.max_len = gector.max_len * 2
-        else:
-            self.max_len = 32
-
-        if not os.path.exists("temp"):
-            os.makedirs("temp")
+        if temp_dir is None:
+            temp_dir = tempfile.mkdtemp()
+        self.temp_dir = temp_dir
+        self.temp_path = os.path.join(self.temp_dir, self.file_name + ".wav")
 
         if self.file_ext in VIDEO_EXT:
             self.is_video = True
@@ -55,6 +28,64 @@ class SubGenerator:
             raise ValueError("Extension mismatch")
 
         self.sub_format = sub_format
+        if output_directory is None:
+            output_directory = self.temp_dir
+        self.output_directory = output_directory
+        self.output_file_handle_dict = {}
+
+class SubGenerator:
+    def __init__(self, 
+        file_path, 
+        asr_model,
+        normalizer,
+        gector=None,
+        src_lang='vi', 
+        split_threshold_ms=200,
+        split_duration_ms=5000, 
+        min_words=3,
+        max_words=12, 
+        sub_format=['srt'], 
+        output_directory="./temp",
+        segment_backend='vad',
+        classify_segment=True):
+        super(SubGenerator, self).__init__()
+
+        if not os.path.exists(file_path):
+            raise ValueError("File does not exist: %s" % file_path)
+
+        self.file_path = file_path
+        self.file_name, self.file_ext = os.path.split(file_path)[-1].split(".")
+        self.min_words = min_words
+        self.max_words = max_words
+        self.temp_dir = DEFAULT_TEMP_DIR
+        self.temp_path = os.path.join(self.temp_dir, self.file_name + ".wav")
+        self.allow_tags = {"speech", "male", "female", "noisy_speech", "music"}
+        self.split_duration_ms = split_duration_ms
+        self.split_threshold_ms = split_threshold_ms
+        self.src_lang = src_lang
+        self.segment_backend = segment_backend
+        self.classify_segment = classify_segment
+
+        self.model = asr_model
+        self.itn = normalizer
+        self.gector = gector
+        if gector is not None:
+            self.max_len = gector.max_len * 2
+        else:
+            self.max_len = 32
+
+        if self.file_ext in VIDEO_EXT:
+            self.is_video = True
+            extract_audio(self.file_path, self.temp_path)
+        elif self.file_ext in AUDIO_EXT:
+            self.is_video = False
+            convert_audio(self.file_path, self.temp_path)
+        else:
+            raise ValueError("Extension mismatch")
+
+        self.sub_format = sub_format
+        if output_directory is None:
+            output_directory = self.temp_dir
         self.output_directory = output_directory
         self.output_file_handle_dict = {}
     
@@ -67,7 +98,7 @@ class SubGenerator:
 
         return final_transcript, final_tokens
 
-    def create_sub(self):
+    def create_sub(self, show_progress=False, transcribe_music=False):
         self.audio_file = AudioFile(self.temp_path)
         for format in self.sub_format:
             output_filename = os.path.join(
@@ -79,24 +110,44 @@ class SubGenerator:
             if format == "vtt":
                 self.output_file_handle_dict[format].write("WEBVTT\n")
                 self.output_file_handle_dict[format].write("Kind: captions\n\n")
-        progress_bar = tqdm.tqdm(
-            total=int(self.audio_file.audio_length * 1000))
+        
+        if show_progress:
+            progress_bar = tqdm.tqdm(
+                total=int(self.audio_file.audio_length * 1000))
         line_count = 1
         last = 0
         trans_dict = None
-        for start, end, audio in self.audio_file.split():
-            _, tokens, _ = self.model.transcribe_with_metadata(audio, start)[0]
-            if trans_dict is not None:
-                if start - trans_dict.get('end', 0) > self.split_threshold or len(trans_dict['tokens']) > self.max_len:
+        for (start, end, audio, tag) in self.audio_file.split(backend=self.segment_backend):
+            if tag not in self.allow_tags:
+                continue
+            if tag == "music" and not transcribe_music:
+                if trans_dict is not None:
                     final_transcript, final_tokens = self.post_process(trans_dict['tokens'])
                     line_count = self.write_sub(
                         final_transcript, final_tokens, trans_dict['start'], 
-                        trans_dict['end'], line_count, trans_dict['split_points']
+                        trans_dict['end'], line_count, trans_dict['split_times']
+                    )
+                    trans_dict = None
+                write_to_file(self.output_file_handle_dict, "[âm nhạc]",
+                                line_count, (start / 1000, end / 1000))
+                continue
+
+            _, tokens, _ = self.model.transcribe_with_metadata(audio, start)[0]
+            if trans_dict is not None:
+                if (
+                    len(tokens) == 0
+                    or start - trans_dict.get('end', 0) > self.split_threshold_ms
+                    or len(trans_dict['tokens']) > self.max_len
+                ):
+                    final_transcript, final_tokens = self.post_process(trans_dict['tokens'])
+                    line_count = self.write_sub(
+                        final_transcript, final_tokens, trans_dict['start'], 
+                        trans_dict['end'], line_count, trans_dict['split_times']
                     )
                     trans_dict = None
                 else:
                     trans_dict['tokens'].extend(tokens)
-                    trans_dict['split_points'].append(trans_dict['end'])
+                    trans_dict['split_times'].append(trans_dict['end'])
                     trans_dict['end'] = end
             
             if trans_dict is None:
@@ -104,69 +155,110 @@ class SubGenerator:
                     'tokens': tokens,
                     'start': start,
                     'end': end,
-                    'split_points': [],
+                    'split_times': [],
                 }
-
-            progress_bar.update(int(end - last))
+            
+            if show_progress:
+                progress_bar.update(int(end - last))
             last = end
         
         if trans_dict is not None:
             final_transcript, final_tokens = self.post_process(trans_dict['tokens'])
             line_count = self.write_sub(
                             final_transcript, final_tokens, trans_dict['start'], 
-                            trans_dict['end'], line_count, trans_dict['split_points']
+                            trans_dict['end'], line_count, trans_dict['split_times']
                         )
-
+        if show_progress:
+            progress_bar.update(int(progress_bar.total - last))
         self.audio_file.close()
         self.close_file()
 
         if os.path.exists(self.temp_path):
             os.remove(self.temp_path)
     
-    def write_sub(self, transcript, tokens, start, end, line_count, split_points=[]):
-        if split_points is None:
-            split_points = []
-        split_points.append(1e8)
+    def write_sub(self, transcript, tokens, start, end, line_count, split_times=[]):
+        if split_times is None:
+            split_times = []
+        split_times.append(1e8)
+        num_tokens = len(tokens)
 
-        if len(tokens) == 0:
+        if num_tokens == 0:
             return line_count
 
-        if end - start > self.split_duration:
-            infer_text = ""
-            num_inferred = 0
-            split_idx = 0
-            prev_start = tokens[0]['start']
-            prev_end = None
+        split_tokens = [[] for _ in range(len(split_times))]
+        split_idx = 0
 
-            for token in tokens:
-                if (
-                    num_inferred > self.max_words 
-                    or token['start'] > split_points[split_idx] 
-                    or token['start'] > prev_start + self.split_duration
-                ):
-                    if prev_end is not None:
-                        write_to_file(self.output_file_handle_dict, infer_text,
-                                    line_count, (prev_start / 1000, prev_end / 1000))
-                        line_count += 1
-                        infer_text = ""
-                        num_inferred = 0
-                        prev_start = token['start']
+        for token in tokens:
+            while token['start'] > split_times[split_idx]:
+                split_idx += 1
+            split_tokens[split_idx].append(token)
+        
+        for sub_tokens in split_tokens:
+            num_sub_tokens = len(sub_tokens)
+            if num_sub_tokens == 0:
+                continue
+            start = sub_tokens[0]["start"]
+            end = sub_tokens[-1]["end"]
 
-                    if token['start'] > split_points[split_idx]:
-                        split_idx += 1
+            if end - start > self.split_duration_ms:
+                last_tokens_length = num_sub_tokens % self.max_words
+                num_lines = num_sub_tokens // self.max_words
+                if last_tokens_length >= self.min_words or num_lines == 0:
+                    num_lines += 1
 
-                infer_text += token['text'] + " "
-                num_inferred += 1
-                prev_end = token['end']
-
-            if infer_text:
-                write_to_file(self.output_file_handle_dict, infer_text,
-                                line_count, (prev_start / 1000, token['end'] / 1000))
+                for i in range(num_lines):
+                    if i == num_lines - 1:
+                        token_batch = sub_tokens[i * self.max_words:]
+                    else:
+                        token_batch = sub_tokens[i * self.max_words:(i + 1) * self.max_words]
+                    infer_text = " ".join([token["text"] for token in token_batch])
+                    write_to_file(
+                        self.output_file_handle_dict, infer_text,
+                        line_count, (token_batch[0]["start"] / 1000, token_batch[-1]["end"] / 1000)
+                    )
+                    line_count += 1
+            else:
+                text = " ".join([token["text"] for token in sub_tokens])
+                write_to_file(self.output_file_handle_dict, text,
+                                line_count, (start / 1000, end / 1000))
                 line_count += 1
-        else:
-            write_to_file(self.output_file_handle_dict, transcript,
-                            line_count, (start / 1000, end / 1000))
-            line_count += 1
+
+        # if end - start > self.split_duration_ms:
+        #     infer_text = ""
+        #     num_inferred = 0
+        #     split_idx = 0
+        #     prev_start = tokens[0]['start']
+        #     prev_end = None
+
+        #     for token in tokens:
+        #         if (
+        #             num_inferred > self.max_words 
+        #             or token['start'] > split_times[split_idx] 
+        #             or token['start'] > prev_start + self.split_duration_ms
+        #         ):
+        #             if prev_end is not None:
+        #                 write_to_file(self.output_file_handle_dict, infer_text,
+        #                         line_count, (prev_start / 1000, prev_end / 1000))
+        #                 line_count += 1
+        #                 infer_text = ""
+        #                 num_inferred = 0
+        #                 prev_start = token['start']
+
+        #             if token['start'] > split_times[split_idx]:
+        #                 split_idx += 1
+
+        #         infer_text += token['text'] + " "
+        #         num_inferred += 1
+        #         prev_end = token['end']
+
+        #     if infer_text:
+        #         write_to_file(self.output_file_handle_dict, infer_text,
+        #                         line_count, (prev_start / 1000, token['end'] / 1000))
+        #         line_count += 1
+        # else:
+        #     write_to_file(self.output_file_handle_dict, transcript,
+        #                     line_count, (start / 1000, end / 1000))
+        #     line_count += 1
         
         return line_count
 

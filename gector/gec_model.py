@@ -78,8 +78,9 @@ class GecBERTModel(object):
             model = Seq2Labels(vocab=self.vocab,
                                text_field_embedder=self._get_embbeder(weights_name, special_tokens_fix),
                                confidence=self.confidence
-                               ).to(self.device)
-            model.load_state_dict(torch.load(model_path))
+                               )
+            model.load_state_dict(torch.load(model_path, map_location="cpu"))
+            model = model.to(self.device)
             model.eval()
             self.models.append(model)
 
@@ -127,7 +128,7 @@ class GecBERTModel(object):
             if num_token <= self.chunk_size:
                 result.append(tokens)
             elif num_token > self.chunk_size and num_token < (self.chunk_size * 2 - self.overlap_size):
-                split_idx = (self.num_token + self.overlap_size + 1) // 2
+                split_idx = (num_token + self.overlap_size + 1) // 2
                 result.append(tokens[:split_idx])
                 result.append(tokens[split_idx - self.overlap_size:])
             else:
