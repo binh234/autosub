@@ -24,7 +24,7 @@ from text_processing.token_parser import TokenParser
 
 class InverseNormalizer(Normalizer):
     """
-    Inverse normalizer that converts text from spoken to written form. Useful for ASR postprocessing. 
+    Inverse normalizer that converts text from spoken to written form. Useful for ASR postprocessing.
     Input is expected to have no punctuation outside of approstrophe (') and dash (-) and be lower cased.
 
     Args:
@@ -48,7 +48,7 @@ class InverseNormalizer(Normalizer):
 
     def inverse_normalize_list(self, texts: List[str], verbose=False) -> List[str]:
         """
-        NeMo inverse text normalizer 
+        NeMo inverse text normalizer
 
         Args:
             texts: list of input strings
@@ -58,7 +58,7 @@ class InverseNormalizer(Normalizer):
         """
         return self.normalize_list(texts=texts, verbose=verbose)
 
-    def inverse_normalize(self, text: str, verbose: bool=False) -> str:
+    def inverse_normalize(self, text: str, verbose: bool = False) -> str:
         """
         Main function. Inverse normalizes tokens from spoken to written form
             e.g. twelve kilograms -> 12 kg
@@ -70,10 +70,10 @@ class InverseNormalizer(Normalizer):
         Returns: written form
         """
         return self.normalize(text=text, verbose=verbose)
-    
+
     def inverse_normalize_list_with_metadata(self, text_metas: List, verbose=False) -> List[str]:
         """
-        NeMo inverse text normalizer 
+        NeMo inverse text normalizer
 
         Args:
             texts: list of input strings
@@ -90,8 +90,8 @@ class InverseNormalizer(Normalizer):
                 raise Exception
             res.append(text)
         return res
-    
-    def inverse_normalize_with_metadata(self, text_meta: List, verbose: bool=False):
+
+    def inverse_normalize_with_metadata(self, text_meta: List, verbose: bool = False):
         """
         Main function. Inverse normalizes tokens from spoken to written form
             e.g. twelve kilograms -> 12 kg
@@ -122,14 +122,17 @@ class InverseNormalizer(Normalizer):
                 num_target_tokens = j2 - j1
                 time_step = (end - start) / num_target_tokens
                 for c in range(num_target_tokens):
-                    normalize_text_meta.append({
-                        'text': target_tokens[j1 + c],
-                        'start': start,
-                        'end': start + time_step,
-                    })
+                    normalize_text_meta.append(
+                        {
+                            'text': target_tokens[j1 + c],
+                            'start': start,
+                            'end': start + time_step,
+                        }
+                    )
                     start += time_step
-        
+
         return normalize_text_meta
+
 
 def parse_args():
     parser = ArgumentParser()

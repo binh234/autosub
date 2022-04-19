@@ -33,21 +33,24 @@ class FileGenObject(object):
         self.output_directory = output_directory
         self.output_file_handle_dict = {}
 
+
 class SubGenerator:
-    def __init__(self, 
-        file_path, 
+    def __init__(
+        self,
+        file_path,
         asr_model,
         normalizer,
         gector=None,
-        src_lang='vi', 
+        src_lang='vi',
         split_threshold_ms=200,
-        split_duration_ms=5000, 
+        split_duration_ms=5000,
         min_words=3,
-        max_words=12, 
-        sub_format=['srt'], 
+        max_words=12,
+        sub_format=['srt'],
         output_directory="./temp",
         segment_backend='vad',
-        classify_segment=True):
+        classify_segment=True,
+    ):
         super(SubGenerator, self).__init__()
 
         if not os.path.exists(file_path):
@@ -88,7 +91,7 @@ class SubGenerator:
             output_directory = self.temp_dir
         self.output_directory = output_directory
         self.output_file_handle_dict = {}
-    
+
     def post_process(self, tokens):
         final_tokens = self.itn.inverse_normalize_with_metadata(tokens, verbose=False)
         if self.gector:
@@ -101,19 +104,16 @@ class SubGenerator:
     def create_sub(self, show_progress=False, transcribe_music=False):
         self.audio_file = AudioFile(self.temp_path)
         for format in self.sub_format:
-            output_filename = os.path.join(
-                self.output_directory, self.file_name + "." + format)
+            output_filename = os.path.join(self.output_directory, self.file_name + "." + format)
             print("Creating file: " + output_filename)
-            self.output_file_handle_dict[format] = open(
-                output_filename, mode="w", encoding="utf-8")
+            self.output_file_handle_dict[format] = open(output_filename, mode="w", encoding="utf-8")
             # For VTT format, write header
             if format == "vtt":
                 self.output_file_handle_dict[format].write("WEBVTT\n")
                 self.output_file_handle_dict[format].write("Kind: captions\n\n")
-        
+
         if show_progress:
-            progress_bar = tqdm.tqdm(
-                total=int(self.audio_file.audio_length * 1000))
+            progress_bar = tqdm.tqdm(total=int(self.audio_file.audio_length * 1000))
         line_count = 1
         last = 0
         trans_dict = None
@@ -124,12 +124,15 @@ class SubGenerator:
                 if trans_dict is not None:
                     final_transcript, final_tokens = self.post_process(trans_dict['tokens'])
                     line_count = self.write_sub(
-                        final_transcript, final_tokens, trans_dict['start'], 
-                        trans_dict['end'], line_count, trans_dict['split_times']
+                        final_transcript,
+                        final_tokens,
+                        trans_dict['start'],
+                        trans_dict['end'],
+                        line_count,
+                        trans_dict['split_times'],
                     )
                     trans_dict = None
-                write_to_file(self.output_file_handle_dict, "[âm nhạc]",
-                                line_count, (start / 1000, end / 1000))
+                write_to_file(self.output_file_handle_dict, "[âm nhạc]", line_count, (start / 1000, end / 1000))
                 continue
 
             _, tokens, _ = self.model.transcribe_with_metadata(audio, start)[0]
@@ -141,15 +144,19 @@ class SubGenerator:
                 ):
                     final_transcript, final_tokens = self.post_process(trans_dict['tokens'])
                     line_count = self.write_sub(
-                        final_transcript, final_tokens, trans_dict['start'], 
-                        trans_dict['end'], line_count, trans_dict['split_times']
+                        final_transcript,
+                        final_tokens,
+                        trans_dict['start'],
+                        trans_dict['end'],
+                        line_count,
+                        trans_dict['split_times'],
                     )
                     trans_dict = None
                 else:
                     trans_dict['tokens'].extend(tokens)
                     trans_dict['split_times'].append(trans_dict['end'])
                     trans_dict['end'] = end
-            
+
             if trans_dict is None:
                 trans_dict = {
                     'tokens': tokens,
@@ -157,17 +164,21 @@ class SubGenerator:
                     'end': end,
                     'split_times': [],
                 }
-            
+
             if show_progress:
                 progress_bar.update(int(end - last))
             last = end
-        
+
         if trans_dict is not None:
             final_transcript, final_tokens = self.post_process(trans_dict['tokens'])
             line_count = self.write_sub(
-                            final_transcript, final_tokens, trans_dict['start'], 
-                            trans_dict['end'], line_count, trans_dict['split_times']
-                        )
+                final_transcript,
+                final_tokens,
+                trans_dict['start'],
+                trans_dict['end'],
+                line_count,
+                trans_dict['split_times'],
+            )
         if show_progress:
             progress_bar.update(int(progress_bar.total - last))
         self.audio_file.close()
@@ -175,7 +186,7 @@ class SubGenerator:
 
         if os.path.exists(self.temp_path):
             os.remove(self.temp_path)
-    
+
     def write_sub(self, transcript, tokens, start, end, line_count, split_times=[]):
         if split_times is None:
             split_times = []
@@ -192,7 +203,7 @@ class SubGenerator:
             while token['start'] > split_times[split_idx]:
                 split_idx += 1
             split_tokens[split_idx].append(token)
-        
+
         for sub_tokens in split_tokens:
             num_sub_tokens = len(sub_tokens)
             if num_sub_tokens == 0:
@@ -208,66 +219,29 @@ class SubGenerator:
 
                 for i in range(num_lines):
                     if i == num_lines - 1:
-                        token_batch = sub_tokens[i * self.max_words:]
+                        token_batch = sub_tokens[i * self.max_words :]
                     else:
-                        token_batch = sub_tokens[i * self.max_words:(i + 1) * self.max_words]
+                        token_batch = sub_tokens[i * self.max_words : (i + 1) * self.max_words]
                     infer_text = " ".join([token["text"] for token in token_batch])
                     write_to_file(
-                        self.output_file_handle_dict, infer_text,
-                        line_count, (token_batch[0]["start"] / 1000, token_batch[-1]["end"] / 1000)
+                        self.output_file_handle_dict,
+                        infer_text,
+                        line_count,
+                        (token_batch[0]["start"] / 1000, token_batch[-1]["end"] / 1000),
                     )
                     line_count += 1
             else:
                 text = " ".join([token["text"] for token in sub_tokens])
-                write_to_file(self.output_file_handle_dict, text,
-                                line_count, (start / 1000, end / 1000))
+                write_to_file(self.output_file_handle_dict, text, line_count, (start / 1000, end / 1000))
                 line_count += 1
 
-        # if end - start > self.split_duration_ms:
-        #     infer_text = ""
-        #     num_inferred = 0
-        #     split_idx = 0
-        #     prev_start = tokens[0]['start']
-        #     prev_end = None
-
-        #     for token in tokens:
-        #         if (
-        #             num_inferred > self.max_words 
-        #             or token['start'] > split_times[split_idx] 
-        #             or token['start'] > prev_start + self.split_duration_ms
-        #         ):
-        #             if prev_end is not None:
-        #                 write_to_file(self.output_file_handle_dict, infer_text,
-        #                         line_count, (prev_start / 1000, prev_end / 1000))
-        #                 line_count += 1
-        #                 infer_text = ""
-        #                 num_inferred = 0
-        #                 prev_start = token['start']
-
-        #             if token['start'] > split_times[split_idx]:
-        #                 split_idx += 1
-
-        #         infer_text += token['text'] + " "
-        #         num_inferred += 1
-        #         prev_end = token['end']
-
-        #     if infer_text:
-        #         write_to_file(self.output_file_handle_dict, infer_text,
-        #                         line_count, (prev_start / 1000, token['end'] / 1000))
-        #         line_count += 1
-        # else:
-        #     write_to_file(self.output_file_handle_dict, transcript,
-        #                     line_count, (start / 1000, end / 1000))
-        #     line_count += 1
-        
         return line_count
 
     def sync_sub(self):
         if "srt" not in self.sub_format:
             return
         srt_path = os.path.join(self.output_directory, self.file_name + ".srt")
-        sync_path = os.path.join(
-            self.output_directory, self.file_name + "_synchronized.srt")
+        sync_path = os.path.join(self.output_directory, self.file_name + "_synchronized.srt")
         cmd = f"ffsubsync {self.file_path} -i {srt_path} -o {sync_path}"
 
         subprocess.call(cmd, shell=True)
@@ -282,9 +256,7 @@ class SubGenerator:
 
     def add_sub_to_video(self):
         if self.is_video:
-            srt_path = os.path.join(
-                self.output_directory, self.file_name + ".srt")
-            out_path = os.path.join(
-                self.output_directory, self.file_name + "_sub.mp4")
+            srt_path = os.path.join(self.output_directory, self.file_name + ".srt")
+            out_path = os.path.join(self.output_directory, self.file_name + "_sub.mp4")
             cmd = f"ffmpeg -loglevel quiet -i {self.file_path} -i {srt_path} -y -c copy -c:s mov_text {out_path}"
             os.system(cmd)

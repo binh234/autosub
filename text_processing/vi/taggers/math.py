@@ -14,12 +14,7 @@
 # limitations under the License.
 
 from text_processing.vi.utils import get_abs_path
-from text_processing.vi.graph_utils import (
-    GraphFst,
-    delete_space,
-    delete_extra_space,
-    NEMO_ALPHA
-)
+from text_processing.vi.graph_utils import GraphFst, delete_space, delete_extra_space, NEMO_ALPHA
 
 
 try:
@@ -77,7 +72,8 @@ class MathFst(GraphFst):
                 + optional_graph_power
                 + delete_extra_space
                 + graph_symbols
-                + delete_extra_space, 1
+                + delete_extra_space,
+                1,
             )
             + optional_graph_negative
             + alpha_num

@@ -7,9 +7,7 @@ VOCAB_DIR = Path(__file__).resolve().parent.parent / "data"
 PAD = "@@PADDING@@"
 UNK = "@@UNKNOWN@@"
 START_TOKEN = "$START"
-SEQ_DELIMETERS = {"tokens": " ",
-                  "labels": "SEPL|||SEPR",
-                  "operations": "SEPL__SEPR"}
+SEQ_DELIMETERS = {"tokens": " ", "labels": "SEPL|||SEPR", "operations": "SEPL__SEPR"}
 
 
 def get_verb_form_dicts():
@@ -42,7 +40,6 @@ def get_target_sent_by_edits(source_tokens, edits):
             source_token = target_tokens[target_pos]
         else:
             source_token = ""
-            
         if label == "":
             del target_tokens[target_pos]
             shift_idx -= 1
@@ -53,7 +50,7 @@ def get_target_sent_by_edits(source_tokens, edits):
                 target_pos > 0 and target_tokens[target_pos - 1] == word
             ):
                 continue
-            target_tokens[target_pos: target_pos] = [word]
+            target_tokens[target_pos:target_pos] = [word]
             shift_idx += 1
         elif label.startswith("$TRANSFORM_"):
             word = apply_reverse_transformation(source_token, label)
@@ -64,7 +61,7 @@ def get_target_sent_by_edits(source_tokens, edits):
             word = label.replace("$REPLACE_", "")
             target_tokens[target_pos] = word
         elif label.startswith("$MERGE_"):
-            target_tokens[target_pos + 1: target_pos + 1] = [label]
+            target_tokens[target_pos + 1 : target_pos + 1] = [label]
             shift_idx += 1
 
     return replace_merge_transforms(target_tokens)
@@ -73,6 +70,10 @@ def get_target_sent_by_edits(source_tokens, edits):
 def replace_merge_transforms(tokens):
     if all(not x.startswith("$MERGE_") for x in tokens):
         return tokens
+    if tokens[0].startswith("$MERGE_"):
+        tokens = tokens[1:]
+    if tokens[-1].startswith("$MERGE_"):
+        tokens = tokens[:-1]
 
     target_line = " ".join(tokens)
     target_line = target_line.replace(" $MERGE_HYPHEN ", "-")

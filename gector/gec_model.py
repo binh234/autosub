@@ -1,4 +1,5 @@
 """Wrapper of AllenNLP model. Fixes errors based on model predictions"""
+from difflib import SequenceMatcher
 import logging
 import os
 import sys
@@ -26,28 +27,33 @@ logger = logging.getLogger(__file__)
 
 
 class GecBERTModel(object):
-    def __init__(self, vocab_path=None, model_paths=None,
-                 weights=None,
-                 device=None,
-                 max_len=64,
-                 min_len=3,
-                 lowercase_tokens=False,
-                 log=False,
-                 iterations=3,
-                 model_name='roberta',
-                 special_tokens_fix=1,
-                 is_ensemble=False,
-                 min_error_probability=0.0,
-                 confidence=0,
-                 resolve_cycles=False,
-                 split_chunk=False,
-                 chunk_size=48,
-                 overlap_size=12,
-                 min_words_cut=6,
-                 punc_dict={':', ".", ",", "?"},
-                 ):
+    def __init__(
+        self,
+        vocab_path=None,
+        model_paths=None,
+        weights=None,
+        device=None,
+        max_len=64,
+        min_len=3,
+        lowercase_tokens=False,
+        log=False,
+        iterations=3,
+        model_name='roberta',
+        special_tokens_fix=1,
+        is_ensemble=False,
+        min_error_probability=0.0,
+        confidence=0,
+        resolve_cycles=False,
+        split_chunk=False,
+        chunk_size=48,
+        overlap_size=12,
+        min_words_cut=6,
+        punc_dict={':', ".", ",", "?"},
+    ):
         self.model_weights = list(map(float, weights)) if weights else [1] * len(model_paths)
-        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu") if device is None else torch.device(device)
+        self.device = (
+            torch.device("cuda" if torch.cuda.is_available() else "cpu") if device is None else torch.device(device)
+        )
         self.max_len = max_len
         self.min_len = min_len
         self.lowercase_tokens = lowercase_tokens
@@ -58,8 +64,9 @@ class GecBERTModel(object):
         self.confidence = confidence
         self.resolve_cycles = resolve_cycles
 
-        assert chunk_size > 0 and chunk_size // 2 >= overlap_size, \
-            "Chunk merging required overlap size must be smaller than half of chunk size"
+        assert (
+            chunk_size > 0 and chunk_size // 2 >= overlap_size
+        ), "Chunk merging required overlap size must be smaller than half of chunk size"
         self.split_chunk = split_chunk
         self.chunk_size = chunk_size
         self.overlap_size = overlap_size
@@ -75,10 +82,11 @@ class GecBERTModel(object):
                 model_name, special_tokens_fix = self._get_model_data(model_path)
             weights_name = get_weights_name(model_name, lowercase_tokens)
             self.indexers.append(self._get_indexer(weights_name, special_tokens_fix))
-            model = Seq2Labels(vocab=self.vocab,
-                               text_field_embedder=self._get_embbeder(weights_name, special_tokens_fix),
-                               confidence=self.confidence
-                               )
+            model = Seq2Labels(
+                vocab=self.vocab,
+                text_field_embedder=self._get_embbeder(weights_name, special_tokens_fix),
+                confidence=self.confidence,
+            )
             model.load_state_dict(torch.load(model_path, map_location="cpu"))
             model = model.to(self.device)
             model.eval()
@@ -117,7 +125,7 @@ class GecBERTModel(object):
                 except RuntimeError:
                     continue
         print("Model is restored", file=sys.stderr)
-    
+
     def split_chunks(self, batch):
         # return batch pairs of indices
         result = []
@@ -130,15 +138,15 @@ class GecBERTModel(object):
             elif num_token > self.chunk_size and num_token < (self.chunk_size * 2 - self.overlap_size):
                 split_idx = (num_token + self.overlap_size + 1) // 2
                 result.append(tokens[:split_idx])
-                result.append(tokens[split_idx - self.overlap_size:])
+                result.append(tokens[split_idx - self.overlap_size :])
             else:
                 for i in range(0, num_token - self.overlap_size, self.stride):
-                    result.append(tokens[i: i + self.chunk_size])
+                    result.append(tokens[i : i + self.chunk_size])
 
             indices.append((start, len(result)))
 
         return result, indices
-    
+
     def check_alnum(self, s):
         if len(s) < 2:
             return False
@@ -152,7 +160,7 @@ class GecBERTModel(object):
         # Return next tokens if current tokens list is empty
         if not tokens:
             return next_tokens
-        
+
         for token in tokens[::-1]:
             if token not in self.punc_dict:
                 if self.check_alnum(token):
@@ -161,15 +169,15 @@ class GecBERTModel(object):
                     word_len = len(clean_token.split())
                 else:
                     word_len = 1
-                
+
                 if num_words_cut + word_len > self.min_words_cut:
                     break
-                
+
                 num_words_cut += word_len
             tail_idx += 1
-        
+
         tokens = tokens[:-tail_idx]
-        
+
         num_words_pass = self.overlap_size - num_words_cut
         for token in next_tokens:
             if token not in self.punc_dict:
@@ -181,19 +189,19 @@ class GecBERTModel(object):
                     num_words += len(sub_tokens)
                 else:
                     num_words += 1
-                
+
                 if num_words >= num_words_pass:
                     head_idx += 1
                     if num_words > num_words_pass:
                         idx = num_words - num_words_pass
-                        tokens.append("".join(sub_tokens[len(sub_tokens) - idx:]))
+                        tokens.append("".join(sub_tokens[len(sub_tokens) - idx :]))
                     break
 
             head_idx += 1
 
         tokens.extend(next_tokens[head_idx:])
         return tokens
-    
+
     def merge_chunks(self, batch):
         result = []
         if len(batch) == 1 or self.overlap_size == 0:
@@ -213,7 +221,7 @@ class GecBERTModel(object):
         t11 = time()
         predictions = []
         for batch, model in zip(batches, self.models):
-            batch = util.move_to_device(batch.as_tensor_dict(), 0 if self.device!=torch.device("cpu") else -1)
+            batch = util.move_to_device(batch.as_tensor_dict(), 0 if self.device != torch.device("cpu") else -1)
             with torch.no_grad():
                 prediction = model.forward(**batch)
             predictions.append(prediction)
@@ -242,38 +250,41 @@ class GecBERTModel(object):
         elif sugg_token.startswith('$TRANSFORM_') or sugg_token.startswith("$MERGE_"):
             sugg_token_clear = sugg_token[:]
         else:
-            sugg_token_clear = sugg_token[sugg_token.index('_') + 1:]
+            sugg_token_clear = sugg_token[sugg_token.index('_') + 1 :]
 
         return start_pos - 1, end_pos - 1, sugg_token_clear, prob
 
     def _get_embbeder(self, weights_name, special_tokens_fix):
-        embedders = {'bert': PretrainedBertEmbedder(
-            pretrained_model=weights_name,
-            requires_grad=False,
-            top_layer_only=True,
-            special_tokens_fix=special_tokens_fix)
+        embedders = {
+            'bert': PretrainedBertEmbedder(
+                pretrained_model=weights_name,
+                requires_grad=False,
+                top_layer_only=True,
+                special_tokens_fix=special_tokens_fix,
+            )
         }
         text_field_embedder = BasicTextFieldEmbedder(
             token_embedders=embedders,
             embedder_to_indexer_map={"bert": ["bert", "bert-offsets"]},
-            allow_unmatched_keys=True)
+            allow_unmatched_keys=True,
+        )
         return text_field_embedder
 
     def _get_indexer(self, weights_name, special_tokens_fix):
         if "phobert" in weights_name:
             bert_token_indexer = WordpieceIndexer(
-            pretrained_model=weights_name,
-            max_pieces_per_token=5,
-            do_lowercase=self.lowercase_tokens,
-            use_starting_offsets=True,
-            special_tokens_fix=special_tokens_fix
-        )
+                pretrained_model=weights_name,
+                max_pieces_per_token=5,
+                do_lowercase=self.lowercase_tokens,
+                use_starting_offsets=True,
+                special_tokens_fix=special_tokens_fix,
+            )
         else:
             bert_token_indexer = PretrainedBertIndexer(
                 pretrained_model=weights_name,
                 do_lowercase=self.lowercase_tokens,
                 max_pieces_per_token=5,
-                special_tokens_fix=special_tokens_fix
+                special_tokens_fix=special_tokens_fix,
             )
         return {'bert': bert_token_indexer}
 
@@ -307,8 +318,7 @@ class GecBERTModel(object):
         idx = max_vals[1].tolist()
         return probs, idx, error_probs.tolist()
 
-    def update_final_batch(self, final_batch, pred_ids, pred_batch,
-                           prev_preds_dict):
+    def update_final_batch(self, final_batch, pred_ids, pred_batch, prev_preds_dict):
         new_pred_ids = []
         total_updated = 0
         for i, orig_id in enumerate(pred_ids):
@@ -328,14 +338,10 @@ class GecBERTModel(object):
                 continue
         return final_batch, new_pred_ids, total_updated
 
-    def postprocess_batch(self, batch, all_probabilities, all_idxs,
-                          error_probs):
+    def postprocess_batch(self, batch, all_probabilities, all_idxs, error_probs):
         all_results = []
         noop_index = self.vocab.get_token_index("$KEEP", "labels")
-        for tokens, probabilities, idxs, error_prob in zip(batch,
-                                                           all_probabilities,
-                                                           all_idxs,
-                                                           error_probs):
+        for tokens, probabilities, idxs, error_prob in zip(batch, all_probabilities, all_idxs, error_probs):
             length = min(len(tokens), self.max_len)
             edits = []
 
@@ -359,10 +365,8 @@ class GecBERTModel(object):
                 if idxs[i] == noop_index:
                     continue
 
-                sugg_token = self.vocab.get_token_from_index(idxs[i],
-                                                             namespace='labels')
-                action = self.get_token_action(token, i, probabilities[i],
-                                               sugg_token)
+                sugg_token = self.vocab.get_token_from_index(idxs[i], namespace='labels')
+                action = self.get_token_action(token, i, probabilities[i], sugg_token)
                 if not action:
                     continue
 
@@ -370,7 +374,7 @@ class GecBERTModel(object):
             all_results.append(get_target_sent_by_edits(tokens, edits))
         return all_results
 
-    def handle_batch(self, full_batch):
+    def handle_batch(self, full_batch, merge_punc=True):
         """
         Handle batch of requests.
         """
@@ -381,8 +385,7 @@ class GecBERTModel(object):
         final_batch = full_batch[:]
         batch_size = len(full_batch)
         prev_preds_dict = {i: [final_batch[i]] for i in range(len(final_batch))}
-        short_ids = [i for i in range(len(full_batch))
-                     if len(full_batch[i]) < self.min_len]
+        short_ids = [i for i in range(len(full_batch)) if len(full_batch[i]) < self.min_len]
         pred_ids = [i for i in range(len(full_batch)) if i not in short_ids]
         total_updates = 0
 
@@ -395,42 +398,72 @@ class GecBERTModel(object):
                 break
             probabilities, idxs, error_probs = self.predict(sequences)
 
-            pred_batch = self.postprocess_batch(orig_batch, probabilities,
-                                                idxs, error_probs)
+            pred_batch = self.postprocess_batch(orig_batch, probabilities, idxs, error_probs)
             if self.log:
                 print(f"Iteration {n_iter + 1}. Predicted {round(100*len(pred_ids)/batch_size, 1)}% of sentences.")
 
-            final_batch, pred_ids, cnt = \
-                self.update_final_batch(final_batch, pred_ids, pred_batch,
-                                        prev_preds_dict)
+            final_batch, pred_ids, cnt = self.update_final_batch(final_batch, pred_ids, pred_batch, prev_preds_dict)
             total_updates += cnt
 
             if not pred_ids:
                 break
         if self.split_chunk:
-            final_batch = [
-                self.merge_chunks(final_batch[start:end]) 
-                for (start, end) in indices
-            ]
+            final_batch = [self.merge_chunks(final_batch[start:end]) for (start, end) in indices]
         else:
             final_batch = [" ".join(x) for x in final_batch]
-        final_batch = [re.sub(r'\s+([\.\,\?\:])', r'\1', x) for x in final_batch]
+        if merge_punc:
+            final_batch = [re.sub(r'\s+([\.\,\?\:])', r'\1', x) for x in final_batch]
 
         return final_batch, total_updates
 
     def handle_batch_with_metadata(self, full_batch_meta):
         """
-        Handle batch of requests.
+        Handle batch of requests and also return metadata after processing.
         """
         full_batch = [[token['text'] for token in batch] for batch in full_batch_meta]
-        final_batch, total_updates = self.handle_batch(full_batch)
+        final_batch, total_updates = self.handle_batch(full_batch, merge_punc=False)
         final_batch_meta = []
 
-        for batch, batch_meta in zip(final_batch, full_batch_meta):
-            batch = batch.split()
-            final_batch_meta.append([{
-                'text': batch[i],
-                'start': batch_meta[i]['start'],
-                'end': batch_meta[i]['end'],
-            } for i in range(len(batch))])
+        for text, meta in zip(final_batch, full_batch_meta):
+            final_batch_meta.append(self.perfect_matching(meta, text))
+
         return final_batch_meta, total_updates
+
+    def perfect_matching(self, text_meta, normalize_text):
+        text = " ".join([token['text'] for token in text_meta])
+        normalize_text_meta = []
+        source_tokens = text.split()
+        norm_target_tokens = re.sub(r'\s+([\.\,\?\:])', r'\1', normalize_text).split()
+        target_tokens = re.sub(r'\s+([\.\,\?\:])', r' ', normalize_text).strip().lower().split()
+        matcher = SequenceMatcher(None, source_tokens, target_tokens)
+        diffs = list(matcher.get_opcodes())
+
+        for diff in diffs:
+            tag, i1, i2, j1, j2 = diff
+
+            if tag == "equal":
+                num_target_tokens = j2 - j1
+                for c in range(num_target_tokens):
+                    normalize_text_meta.append(
+                        {
+                            'text': norm_target_tokens[j1 + c],
+                            'start': text_meta[i1 + c]["start"],
+                            'end': text_meta[i1 + c]["end"],
+                        }
+                    )
+            else:
+                start = text_meta[i1]['start']
+                end = text_meta[i2 - 1]['end']
+                num_target_tokens = j2 - j1
+                time_step = (end - start) / num_target_tokens
+                for c in range(num_target_tokens):
+                    normalize_text_meta.append(
+                        {
+                            'text': norm_target_tokens[j1 + c],
+                            'start': start,
+                            'end': start + time_step,
+                        }
+                    )
+                    start += time_step
+
+        return normalize_text_meta

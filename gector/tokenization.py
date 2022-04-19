@@ -40,8 +40,7 @@ def get_bpe_groups(token_offsets, bpe_offsets, input_ids, max_bpe_pieces=5):
     return bpe_groups, saved_ids
 
 
-def reduce_input_ids(input_ids, bpe_groups, saved_ids,
-                     max_bpe_length=80, max_bpe_pieces=5):
+def reduce_input_ids(input_ids, bpe_groups, saved_ids, max_bpe_length=80, max_bpe_pieces=5):
     # check if sequence is satisfy max_bpe_length constraint
     while len(saved_ids) > max_bpe_length:
         max_bpe_pieces -= 1
@@ -63,9 +62,9 @@ def reduce_input_ids(input_ids, bpe_groups, saved_ids,
     return reduced_ids, correct_offsets
 
 
-def get_offsets_and_reduce_input_ids(tokenizer_output, token_offset_list,
-                                     index_name="bert", max_bpe_length=80,
-                                     max_bpe_pieces=5):
+def get_offsets_and_reduce_input_ids(
+    tokenizer_output, token_offset_list, index_name="bert", max_bpe_length=80, max_bpe_pieces=5
+):
     timings = {"bpe": 0, "reduce": 0, "mask": 0}
     output_ids, output_offsets, output_masks = [], [], []
     for i, token_offsets in enumerate(token_offset_list):
@@ -74,17 +73,14 @@ def get_offsets_and_reduce_input_ids(tokenizer_output, token_offset_list,
         t0 = time()
         # get bpe level offsets
         bpe_offsets = tokenizer_output['offset_mapping'][i]
-        bpe_groups, saved_ids = get_bpe_groups(token_offsets, bpe_offsets,
-                                               input_ids,
-                                               max_bpe_pieces=max_bpe_pieces)
+        bpe_groups, saved_ids = get_bpe_groups(token_offsets, bpe_offsets, input_ids, max_bpe_pieces=max_bpe_pieces)
         t1 = time()
         timings["bpe"] += t1 - t0
 
         # reduce sequence length
-        reduced_ids, correct_offsets = reduce_input_ids(input_ids, bpe_groups,
-                                                        saved_ids,
-                                                        max_bpe_length=max_bpe_length,
-                                                        max_bpe_pieces=max_bpe_pieces)
+        reduced_ids, correct_offsets = reduce_input_ids(
+            input_ids, bpe_groups, saved_ids, max_bpe_length=max_bpe_length, max_bpe_pieces=max_bpe_pieces
+        )
 
         t2 = time()
         timings["reduce"] += t2 - t1
@@ -102,9 +98,7 @@ def get_offsets_and_reduce_input_ids(tokenizer_output, token_offset_list,
     # timings = {k: f"{round(v * 100 / tt, 2)}%" for k, v in timings.items()}
     # print(timings)
 
-    output = {index_name: output_ids,
-              f"{index_name}-offsets": output_offsets,
-              "mask": output_masks}
+    output = {index_name: output_ids, f"{index_name}-offsets": output_offsets, "mask": output_masks}
     return output
 
 
@@ -142,8 +136,7 @@ def pad_output(output, pad_idx=0):
     return padded_output
 
 
-def tokenize_batch(tokenizer, batch_tokens, index_name="bert",
-                   max_bpe_length=80, max_bpe_pieces=5):
+def tokenize_batch(tokenizer, batch_tokens, index_name="bert", max_bpe_length=80, max_bpe_pieces=5):
     timings = {}
     t0 = time()
     # get batch with sentences
@@ -154,19 +147,20 @@ def tokenize_batch(tokenizer, batch_tokens, index_name="bert",
     t1 = time()
     timings["offset_time"] = t1 - t0
     # tokenize batch
-    tokenizer_output = tokenizer.batch_encode_plus(batch_sentences,
-                                                   pad_to_max_length=False,
-                                                   return_offsets_mapping=True,
-                                                   add_special_tokens=False)
+    tokenizer_output = tokenizer.batch_encode_plus(
+        batch_sentences, pad_to_max_length=False, return_offsets_mapping=True, add_special_tokens=False
+    )
 
     t2 = time()
     timings["tokenize_time"] = t2 - t1
     # postprocess batch
-    output = get_offsets_and_reduce_input_ids(tokenizer_output,
-                                              token_offset_list,
-                                              index_name=index_name,
-                                              max_bpe_length=max_bpe_length,
-                                              max_bpe_pieces=max_bpe_pieces)
+    output = get_offsets_and_reduce_input_ids(
+        tokenizer_output,
+        token_offset_list,
+        index_name=index_name,
+        max_bpe_length=max_bpe_length,
+        max_bpe_pieces=max_bpe_pieces,
+    )
 
     t3 = time()
     timings["reduce_time"] = t3 - t2

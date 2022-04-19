@@ -45,7 +45,7 @@ def load_kaggle_text_norm_file(file_path: str) -> List[Instance]:
     """
     https://www.kaggle.com/richardwilliamsproat/text-normalization-for-english-russian-and-polish
     Loads text file in the Kaggle Google text normalization file format: <semiotic class>\t<unnormalized text>\t<`self` if trivial class or normalized text>
-    E.g. 
+    E.g.
     PLAIN   Brillantaisia   <self>
     PLAIN   is      <self>
     PLAIN   a       <self>
@@ -61,7 +61,7 @@ def load_kaggle_text_norm_file(file_path: str) -> List[Instance]:
     Args:
         file_path: file path to text file
 
-    Returns: flat list of instances 
+    Returns: flat list of instances
     """
     res = []
     with open(file_path, 'r') as fp:
@@ -85,7 +85,7 @@ def load_files(file_paths: List[str], load_func=load_kaggle_text_norm_file) -> L
     """
     Load given list of text files using the `load_func` function.
 
-    Args: 
+    Args:
         file_paths: list of file paths
         load_func: loading function
 
@@ -113,7 +113,7 @@ def clean_generic(text: str) -> str:
 
 def evaluate(preds: List[str], labels: List[str], input: Optional[List[str]] = None, verbose: bool = True) -> float:
     """
-    Evaluates accuracy given predictions and labels. 
+    Evaluates accuracy given predictions and labels.
 
     Args:
         preds: predictions

@@ -73,13 +73,10 @@ def _get_year_graph():
     def _get_digits_graph():
         zero = pynini.cross((pynini.union("linh", "lẻ")), "0")
         four = pynini.cross("tư", "4")
-        graph = pynini.union(
-            zero + delete_space + (graph_digit | four),
-            graph_zero + delete_space + graph_digit
-        )
+        graph = pynini.union(zero + delete_space + (graph_digit | four), graph_zero + delete_space + graph_digit)
         graph.optimize()
         return graph
-    
+
     def _get_hundreds_graph(graph_ties, graph_digits):
         graph = (
             graph_digit
@@ -91,9 +88,9 @@ def _get_year_graph():
         return graph
 
     def _get_thousands_graph(graph_ties, graph_digits):
-        graph_hundred_component = (
-            (graph_digit | graph_zero) + delete_space + pynutil.delete("trăm")
-        ) | pynutil.insert("0")
+        graph_hundred_component = ((graph_digit | graph_zero) + delete_space + pynutil.delete("trăm")) | pynutil.insert(
+            "0"
+        )
         graph = (
             graph_digit
             + delete_space

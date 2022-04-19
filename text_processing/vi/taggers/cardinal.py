@@ -60,7 +60,7 @@ class CardinalFst(GraphFst):
             (pynini.project(graph_digit, "input") - last_digit_exception.arcsort()) @ graph_digit,
             graph_one,
             graph_four,
-            graph_five
+            graph_five,
         )
 
         graph_hundred_ties_component = (graph_digit | graph_zero) + delete_space + graph_hundred
@@ -87,13 +87,13 @@ class CardinalFst(GraphFst):
         graph_hundred_component_at_least_one_none_zero_digit = graph_hundred_component @ (
             pynini.closure(NEMO_DIGIT) + (NEMO_DIGIT - "0") + pynini.closure(NEMO_DIGIT)
         )
-        self.graph_hundred_component_at_least_one_none_zero_digit = (
-            graph_hundred_component_at_least_one_none_zero_digit
-        )
+        self.graph_hundred_component_at_least_one_none_zero_digit = graph_hundred_component_at_least_one_none_zero_digit
         graph_hundred_ties_zero = graph_hundred_ties_component | pynutil.insert("000")
 
         graph_thousands = pynini.union(
-            graph_hundred_component_at_least_one_none_zero_digit + delete_space + pynutil.delete(pynini.union("nghìn", "ngàn")),
+            graph_hundred_component_at_least_one_none_zero_digit
+            + delete_space
+            + pynutil.delete(pynini.union("nghìn", "ngàn")),
             pynutil.insert("000", weight=0.1),
         )
 
@@ -112,10 +112,12 @@ class CardinalFst(GraphFst):
             pynutil.insert("000", weight=0.1),
         )
         graph_billion = pynini.union(
-            graph_hundred_component_at_least_one_none_zero_digit + delete_space + pynutil.delete(pynini.union("tỉ", "tỷ")),
+            graph_hundred_component_at_least_one_none_zero_digit
+            + delete_space
+            + pynutil.delete(pynini.union("tỉ", "tỷ")),
             pynutil.insert("000", weight=0.1),
         )
-        
+
         graph = pynini.union(
             graph_billion
             + delete_space
@@ -124,11 +126,7 @@ class CardinalFst(GraphFst):
             + graph_thousands
             + delete_space
             + graph_hundred_ties_zero,
-            graph_ten_thousand
-            + delete_space
-            + graph_ten_thousand_suffix
-            + delete_space
-            + graph_hundred_ties_zero,
+            graph_ten_thousand + delete_space + graph_ten_thousand_suffix + delete_space + graph_hundred_ties_zero,
             graph_hundred_component_at_least_one_none_zero_digit
             + delete_space
             + pynutil.delete(pynini.union("nghìn", "ngàn"))

@@ -39,8 +39,8 @@ except (ModuleNotFoundError, ImportError):
 
 class Normalizer:
     """
-    Normalizer class that converts text from written to spoken form. 
-    Useful for TTS preprocessing. 
+    Normalizer class that converts text from written to spoken form.
+    Useful for TTS preprocessing.
 
     Args:
         input_case: expected input capitalization
@@ -80,7 +80,7 @@ class Normalizer:
 
     def normalize_list(self, texts: List[str], verbose=False) -> List[str]:
         """
-        NeMo text normalizer 
+        NeMo text normalizer
 
         Args:
             texts: list of input strings

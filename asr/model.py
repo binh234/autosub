@@ -17,6 +17,7 @@ STRIDES = 20
 
 # warnings.filterwarnings("error")
 
+
 class BaseASRModel(torch.nn.Module):
     def __init__(self, *args, **kwargs):
         super(BaseASRModel, self).__init__()
@@ -30,9 +31,8 @@ class BaseASRModel(torch.nn.Module):
                     unigrams.append(line.strip())
 
         vocab_dict = tokenizer.get_vocab()
-        sort_vocab = sorted((value, key)
-                            for (key, value) in vocab_dict.items())
-        vocab = [x[1] for x in sort_vocab][:self.vocab_size]
+        sort_vocab = sorted((value, key) for (key, value) in vocab_dict.items())
+        vocab = [x[1] for x in sort_vocab][: self.vocab_size]
 
         vocab_list = vocab
         # convert ctc blank character representation
@@ -42,13 +42,13 @@ class BaseASRModel(torch.nn.Module):
         # specify ctc blank char index, since conventionally it is the last entry of the logit matrix
         decoder = build_ctcdecoder(vocab_list, self.lm_path, unigrams=unigrams)
         return decoder
-    
+
     def forward(self, audio):
         raise NotImplementedError("")
-    
+
     def forward_streaming(self, audio):
         raise NotImplementedError("")
-    
+
     def _split_chunks(self, batch):
         chunk_size = self.chunk_size
         context_size = self.context_size
@@ -62,10 +62,10 @@ class BaseASRModel(torch.nn.Module):
         elif num_sample > chunk_size and num_sample <= (chunk_size * 2 - overlap_size):
             split_idx = ((num_sample + overlap_size + STRIDES) // (2 * STRIDES)) * STRIDES
             result.append(batch[:, :split_idx])
-            result.append(batch[:, split_idx - overlap_size:])
+            result.append(batch[:, split_idx - overlap_size :])
         else:
             for i in range(0, num_sample - overlap_size, stride):
-                result.append(batch[:, i: i + chunk_size])
+                result.append(batch[:, i : i + chunk_size])
 
         return result
 
@@ -83,9 +83,9 @@ class BaseASRModel(torch.nn.Module):
                 if i == 0:
                     result.append(sub_logits[:, :-context_tokens])
                 elif i == num_chunks - 1:
-                    result.append(sub_logits[:, context_tokens-1:])
+                    result.append(sub_logits[:, context_tokens - 1 :])
                 else:
-                    result.append(sub_logits[:, context_tokens-1:-context_tokens])
+                    result.append(sub_logits[:, context_tokens - 1 : -context_tokens])
 
         logits = torch.cat(result, dim=1)
         return logits
@@ -107,9 +107,7 @@ class BaseASRModel(torch.nn.Module):
 
         audio_file.close()
 
-        return [{'start': start,
-                 'end': end,
-                 'transcript': transcript} for start, end, transcript in result]
+        return [{'start': start, 'end': end, 'transcript': transcript} for start, end, transcript in result]
 
     def transcribe_file_with_metadata(self, audio_path):
         audio_file = AudioFile(audio_path)
@@ -125,25 +123,28 @@ class BaseASRModel(torch.nn.Module):
 
         audio_file.close()
 
-        return [{'start': start,
-                 'end': end,
-                 'transcript': transcript,
-                 'tokens': tokens,
-                 'score': score} for start, end, transcript, tokens, score in result]
+        return [
+            {'start': start, 'end': end, 'transcript': transcript, 'tokens': tokens, 'score': score}
+            for start, end, transcript, tokens, score in result
+        ]
 
     def transcribe(self, audio, beam_width=100):
         logits = self.forward_streaming(audio)
 
-        pred_str = [self.decoder.decode(
-            logit.detach().cpu().numpy(), beam_width=beam_width, hotwords=self.hot_words) for logit in logits]
+        pred_str = [
+            self.decoder.decode(logit.detach().cpu().numpy(), beam_width=beam_width, hotwords=self.hot_words)
+            for logit in logits
+        ]
 
         return pred_str
 
     def transcribe_with_metadata(self, audio, start=0, beam_width=100):
         logits = self.forward_streaming(audio)
 
-        beam_batch = [self.decoder.decode_beams(
-            logit.detach().cpu().numpy(), beam_width=beam_width, hotwords=self.hot_words) for logit in logits]
+        beam_batch = [
+            self.decoder.decode_beams(logit.detach().cpu().numpy(), beam_width=beam_width, hotwords=self.hot_words)
+            for logit in logits
+        ]
         pred_batch = []
         for top_beam in beam_batch:
             beam = top_beam[0]
@@ -151,11 +152,13 @@ class BaseASRModel(torch.nn.Module):
             score = beam[3]
 
             for w, i in beam[2]:
-                tokens.append({
-                    'text': w,
-                    'start': start + i[0] * STRIDES,
-                    'end': start + i[1] * STRIDES + WINDOW_SIZE,
-                })
+                tokens.append(
+                    {
+                        'text': w,
+                        'start': start + i[0] * STRIDES,
+                        'end': start + i[1] * STRIDES + WINDOW_SIZE,
+                    }
+                )
 
             pred_batch.append((beam[0], tokens, score))
 
@@ -163,7 +166,18 @@ class BaseASRModel(torch.nn.Module):
 
 
 class HuggingFaceASRModel(BaseASRModel):
-    def __init__(self, model_path, lm_path=None, vocab_path=None, cache_dir=None, sampling_rate=16_000, chunk_size=20, context_size=2.5, hot_words=[], **kwargs):
+    def __init__(
+        self,
+        model_path,
+        lm_path=None,
+        vocab_path=None,
+        cache_dir=None,
+        sampling_rate=16_000,
+        chunk_size=20,
+        context_size=2.5,
+        hot_words=[],
+        **kwargs,
+    ):
         super(HuggingFaceASRModel, self).__init__()
         self.model_path = model_path
         self.lm_path = lm_path
@@ -182,8 +196,7 @@ class HuggingFaceASRModel(BaseASRModel):
 
         print("Loading model...")
         start = time.time()
-        self.device = torch.device(
-            "cuda" if torch.cuda.is_available() else "cpu")
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.processor = Wav2Vec2Processor.from_pretrained(model_path, cache_dir=cache_dir)
         self.model = Wav2Vec2ForCTC.from_pretrained(model_path, cache_dir=cache_dir).eval().to(self.device)
         print("Model loaded successfully in %fs" % (time.time() - start))
@@ -195,54 +208,60 @@ class HuggingFaceASRModel(BaseASRModel):
             self.vocab_size = out.shape[-1]
 
         self.decoder = self.build_lm(self.processor.tokenizer, self.vocab_path)
-        print("Language model loaded successfully in %fs" %
-              (time.time() - start))
-    
+        print("Language model loaded successfully in %fs" % (time.time() - start))
+
     def forward(self, audio):
         if len(audio.shape) == 1:
             audio = [audio]
         elif len(audio.shape) > 2:
-            raise ValueError(
-                "Expected 2 dimensions input, but got %d dimensions" % len(audio.shape))
+            raise ValueError("Expected 2 dimensions input, but got %d dimensions" % len(audio.shape))
 
-        inputs = self.processor(
-            list(audio), sampling_rate=16_000, return_tensors="pt", padding=True).to(self.device)
+        inputs = self.processor(list(audio), sampling_rate=16_000, return_tensors="pt", padding=True).to(self.device)
         with torch.no_grad():
-            attention_mask = None if not hasattr(
-                inputs, 'attention_mask') else inputs.attention_mask
-            logits = self.model(inputs.input_values,
-                                attention_mask=attention_mask,
-                                ).logits
-        
+            attention_mask = None if not hasattr(inputs, 'attention_mask') else inputs.attention_mask
+            logits = self.model(
+                inputs.input_values,
+                attention_mask=attention_mask,
+            ).logits
+
         return logits
-    
+
     def forward_streaming(self, audio):
         if len(audio.shape) == 1:
             audio = [audio]
         elif len(audio.shape) > 2:
-            raise ValueError(
-                "Expected 2 dimensions input, but got %d dimensions" % len(audio.shape))
+            raise ValueError("Expected 2 dimensions input, but got %d dimensions" % len(audio.shape))
 
-        inputs = self.processor(
-            list(audio), sampling_rate=16_000, return_tensors="pt", padding=True)
+        inputs = self.processor(list(audio), sampling_rate=16_000, return_tensors="pt", padding=True)
         all_logits = []
         with torch.no_grad():
             audio_chunks = self._split_chunks(inputs.input_values)
 
             for chunk in audio_chunks:
                 all_logits.append(self.model(chunk.to(self.device)).logits.detach().cpu())
-            
+
             logits = self._merge_chunks(all_logits)
-        
+
         return logits
-    
+
     @property
     def inputs_to_logits_ratio(self):
         return functools.reduce(operator.mul, self.model.config.conv_stride, 1)
 
+
 class SpeechbrainASRModel(BaseASRModel):
-    def __init__(self, model_path, lm_path=None, vocab_path=None, cache_dir=None,
-        sampling_rate=16_000, chunk_size=20, context_size=2.5, hot_words=[], **kwargs):
+    def __init__(
+        self,
+        model_path,
+        lm_path=None,
+        vocab_path=None,
+        cache_dir=None,
+        sampling_rate=16_000,
+        chunk_size=20,
+        context_size=2.5,
+        hot_words=[],
+        **kwargs,
+    ):
         super(SpeechbrainASRModel, self).__init__()
         self.model_path = model_path
         self.lm_path = lm_path
@@ -261,13 +280,8 @@ class SpeechbrainASRModel(BaseASRModel):
 
         print("Loading model...")
         start = time.time()
-        self.device = torch.device(
-            "cuda" if torch.cuda.is_available() else "cpu")
-        self.model = EncoderASR.from_hparams(
-            source=model_path, 
-            savedir=cache_dir, 
-            run_opts={'device': self.device}
-        )
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        self.model = EncoderASR.from_hparams(source=model_path, savedir=cache_dir, run_opts={'device': self.device})
         print("Model loaded successfully in %fs" % (time.time() - start))
 
         # Sanity check
@@ -277,29 +291,26 @@ class SpeechbrainASRModel(BaseASRModel):
             self.vocab_size = out.shape[-1]
 
         self.decoder = self.build_lm(self.model.tokenizer, self.vocab_path)
-        print("Language model loaded successfully in %fs" %
-              (time.time() - start))
-    
+        print("Language model loaded successfully in %fs" % (time.time() - start))
+
     def forward(self, audio):
         if len(audio.shape) == 1:
             audio = [audio]
         elif len(audio.shape) > 2:
-            raise ValueError(
-                "Expected 2 dimensions input, but got %d dimensions" % len(audio.shape))
+            raise ValueError("Expected 2 dimensions input, but got %d dimensions" % len(audio.shape))
 
         inputs = torch.from_numpy(np.asarray(audio))
         input_lens = torch.ones(inputs.shape[0])
         with torch.no_grad():
             logits = self.model(inputs, input_lens)
-        
+
         return logits
-    
+
     def forward_streaming(self, audio):
         if len(audio.shape) == 1:
             audio = [audio]
         elif len(audio.shape) > 2:
-            raise ValueError(
-                "Expected 2 dimensions input, but got %d dimensions" % len(audio.shape))
+            raise ValueError("Expected 2 dimensions input, but got %d dimensions" % len(audio.shape))
 
         audio_inputs = torch.from_numpy(np.asarray(audio))
         all_logits = []
@@ -310,7 +321,7 @@ class SpeechbrainASRModel(BaseASRModel):
                 inputs = chunk
                 input_lens = torch.ones(inputs.shape[0])
                 all_logits.append(self.model(inputs, input_lens).detach().cpu())
-            
+
             logits = self._merge_chunks(all_logits)
-        
+
         return logits

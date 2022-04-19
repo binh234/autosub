@@ -1,4 +1,3 @@
-
 import numpy as np
 import torch
 import wave
@@ -27,7 +26,7 @@ class AudioFile:
         assert self.audio_format == audio_format, "Audio format mismatch"
 
         self.audify_model = None
-    
+
     def _ina_split(self, classify=True):
         self.rewind()
         media_buffer = self.wav_file.readframes(self.wav_file.getnframes())
@@ -48,13 +47,12 @@ class AudioFile:
                 if label == "music" and classify == True:
                     with torch.no_grad():
                         _, _, _, predict_tags = self.audify_model(
-                            torch.FloatTensor(samples).unsqueeze(0),
-                            torch.ones(1)    
+                            torch.FloatTensor(samples).unsqueeze(0), torch.ones(1)
                         )
                         tag = predict_tags[0]
 
                 yield int(time_start * 1000), int(time_end * 1000), samples, tag
-    
+
     def _vad_split(self, aggressiveness=3, classify=True):
         if classify == True and self.audify_model is None:
             self.audify_model = AudifyModel.get_instance()
@@ -71,15 +69,12 @@ class AudioFile:
 
             if classify == True:
                 with torch.no_grad():
-                    _, _, _, predict_tags = self.audify_model(
-                        torch.FloatTensor(samples).unsqueeze(0),
-                        torch.ones(1)    
-                    )
+                    _, _, _, predict_tags = self.audify_model(torch.FloatTensor(samples).unsqueeze(0), torch.ones(1))
                     tag = predict_tags[0]
 
             yield time_start, time_end, samples, tag
 
-    def split(self, aggressiveness=3, classify=True, backend='vad'): 
+    def split(self, aggressiveness=3, classify=True, backend='vad'):
         if backend == "vad":
             return self._vad_split(aggressiveness, classify)
         elif backend == "ina":
@@ -89,6 +84,6 @@ class AudioFile:
 
     def close(self):
         self.wav_file.close()
-    
+
     def rewind(self):
         self.wav_file.rewind()

@@ -41,7 +41,9 @@ class AddressFst(GraphFst):
         graph_cardinal = cardinal.graph_no_exception
 
         split_component = pynini.cross(pynini.union("sẹc", "sẹt"), "/")
-        graph_address = pynini.closure(graph_cardinal + delete_space + split_component + delete_space, 1) + graph_cardinal
+        graph_address = (
+            pynini.closure(graph_cardinal + delete_space + split_component + delete_space, 1) + graph_cardinal
+        )
         graph = pynutil.insert("value: \"") + graph_address + pynutil.insert("\"")
 
         final_graph = self.add_tokens(graph)
