@@ -117,7 +117,9 @@ class SubGenerator:
         line_count = 1
         last = 0
         trans_dict = None
-        for (start, end, audio, tag) in self.audio_file.split(backend=self.segment_backend):
+        for (start, end, audio, tag) in self.audio_file.split(
+            backend=self.segment_backend, classify=self.classify_segment
+        ):
             if tag not in self.allow_tags:
                 continue
             if tag == "music" and not transcribe_music:

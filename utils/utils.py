@@ -23,7 +23,7 @@ def extract_audio(video_path, dst_path, format=DEFAULT_FORMAT):
     # print(cmd)
     subprocess.call(cmd, shell=True)
 
-    return "out.wav"
+    return dst_path
 
 
 def convert_audio(audio_path, dst_path, format=DEFAULT_FORMAT):
@@ -34,7 +34,7 @@ def convert_audio(audio_path, dst_path, format=DEFAULT_FORMAT):
     # print(cmd)
     subprocess.call(cmd, shell=True)
 
-    return "out.wav"
+    return dst_path
 
 
 def read_audio_format_from_wav_file(wav_file):
