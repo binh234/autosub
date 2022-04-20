@@ -13,7 +13,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from text_processing.vi.graph_utils import GraphFst, delete_space
+from text_processing.vi.graph_utils import (
+    GraphFst,
+    delete_space,
+)
 
 
 try:
@@ -44,7 +47,7 @@ class AddressFst(GraphFst):
         graph_address = (
             pynini.closure(graph_cardinal + delete_space + split_component + delete_space, 1) + graph_cardinal
         )
-        graph = pynutil.insert("value: \"") + graph_address + pynutil.insert("\"")
+        graph = pynutil.insert('value: "') + graph_address + pynutil.insert('"')
 
         final_graph = self.add_tokens(graph)
         self.fst = final_graph.optimize()

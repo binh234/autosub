@@ -104,8 +104,12 @@ class InverseNormalizer(Normalizer):
         """
         text = " ".join([token['text'] for token in text_meta])
         normalize_text = self.inverse_normalize(text, verbose=verbose)
-        normalize_text_meta = []
 
+        # If no changes are made, return original
+        if text == normalize_text:
+            return text_meta
+
+        normalize_text_meta = []
         source_tokens = text.split()
         target_tokens = normalize_text.split()
         matcher = SequenceMatcher(None, source_tokens, target_tokens)

@@ -46,36 +46,38 @@ class TimeFst(GraphFst):
         hour = (
             pynutil.delete("hours:")
             + delete_space
-            + pynutil.delete("\"")
+            + pynutil.delete('"')
             + pynini.closure(NEMO_DIGIT, 1)
-            + pynutil.delete("\"")
+            + pynutil.delete('"')
         )
         minute = (
             pynutil.delete("minutes:")
             + delete_space
-            + pynutil.delete("\"")
+            + pynutil.delete('"')
             + pynini.closure(NEMO_DIGIT, 1)
-            + pynutil.delete("\"")
+            + pynutil.delete('"')
         )
         second = (
             pynutil.delete("seconds:")
             + delete_space
-            + pynutil.delete("\"")
+            + pynutil.delete('"')
             + pynini.closure(NEMO_DIGIT, 1)
-            + pynutil.delete("\"")
+            + pynutil.delete('"')
         )
         zone = (
             delete_space
             + insert_space
             + pynutil.delete("zone:")
             + delete_space
-            + pynutil.delete("\"")
+            + pynutil.delete('"')
             + pynini.closure(NEMO_CHAR - " ", 1)
-            + pynutil.delete("\"")
+            + pynutil.delete('"')
         )
         optional_zone = pynini.closure(zone, 0, 1)
         optional_second = pynini.closure(
-            delete_space + pynutil.insert(":") + (second @ add_leading_zero_to_double_digit), 0, 1
+            delete_space + pynutil.insert(":") + (second @ add_leading_zero_to_double_digit),
+            0,
+            1,
         )
 
         graph_h = hour + pynutil.insert("h")

@@ -5,6 +5,7 @@ import os
 import sys
 import re
 from time import time
+import warnings
 
 import torch
 from allennlp.data.dataset import Batch
@@ -153,53 +154,47 @@ class GecBERTModel(object):
         return not (s.isalpha() or s.isdigit())
 
     def apply_chunk_merging(self, tokens, next_tokens):
-        num_words = 0
-        num_words_cut = 0
-        head_idx = tail_idx = 0
-
         # Return next tokens if current tokens list is empty
         if not tokens:
             return next_tokens
 
-        for token in tokens[::-1]:
-            if token not in self.punc_dict:
-                if self.check_alnum(token):
-                    clean_token = re.sub(r"(\d)([a-zA-Z])", r"\1 \2", token)
-                    clean_token = re.sub(r"([a-zA-Z])(\d)", r"\1 \2", clean_token)
-                    word_len = len(clean_token.split())
-                else:
-                    word_len = 1
+        source_token_idx = []
+        target_token_idx = []
+        source_tokens = []
+        target_tokens = []
+        num_keep = self.overlap_size - self.min_words_cut
+        i = 0
+        while len(source_token_idx) < self.overlap_size and -i < len(tokens):
+            i -= 1
+            if tokens[i] not in self.punc_dict:
+                source_token_idx.insert(0, i)
+                source_tokens.insert(0, tokens[i].lower())
 
-                if num_words_cut + word_len > self.min_words_cut:
+        i = 0
+        while len(target_token_idx) < self.overlap_size and i < len(next_tokens):
+            if next_tokens[i] not in self.punc_dict:
+                target_token_idx.append(i)
+                target_tokens.append(next_tokens[i].lower())
+            i += 1
+
+        matcher = SequenceMatcher(None, source_tokens, target_tokens)
+        diffs = list(matcher.get_opcodes())
+
+        for diff in diffs:
+            tag, i1, i2, j1, j2 = diff
+            if tag == "equal":
+                if i1 >= num_keep:
+                    tail_idx = source_token_idx[i1]
+                    head_idx = target_token_idx[j1]
                     break
-
-                num_words_cut += word_len
-            tail_idx += 1
-
-        tokens = tokens[:-tail_idx]
-
-        num_words_pass = self.overlap_size - num_words_cut
-        for token in next_tokens:
-            if token not in self.punc_dict:
-                sub_tokens = []
-                if self.check_alnum(token):
-                    clean_token = re.sub(r"(\d)([a-zA-Z])", r"\1 \2", token)
-                    clean_token = re.sub(r"([a-zA-Z])(\d)", r"\1 \2", clean_token)
-                    sub_tokens = clean_token.split()
-                    num_words += len(sub_tokens)
-                else:
-                    num_words += 1
-
-                if num_words >= num_words_pass:
-                    head_idx += 1
-                    if num_words > num_words_pass:
-                        idx = num_words - num_words_pass
-                        tokens.append("".join(sub_tokens[len(sub_tokens) - idx :]))
+                elif i2 > num_keep:
+                    tail_idx = source_token_idx[num_keep]
+                    head_idx = target_token_idx[j2 - i2 + num_keep]
                     break
+            elif tag == "delete" and i1 == 0:
+                num_keep += i2 // 2
 
-            head_idx += 1
-
-        tokens.extend(next_tokens[head_idx:])
+        tokens = tokens[:tail_idx] + next_tokens[head_idx:]
         return tokens
 
     def merge_chunks(self, batch):
@@ -424,16 +419,31 @@ class GecBERTModel(object):
         final_batch, total_updates = self.handle_batch(full_batch, merge_punc=False)
         final_batch_meta = []
 
-        for text, meta in zip(final_batch, full_batch_meta):
-            final_batch_meta.append(self.perfect_matching(meta, text))
+        for normalize_text, meta in zip(final_batch, full_batch_meta):
+            final_batch_meta.append(self.perfect_matching(meta, normalize_text))
 
         return final_batch_meta, total_updates
 
     def perfect_matching(self, text_meta, normalize_text):
-        text = " ".join([token['text'] for token in text_meta])
         normalize_text_meta = []
+        final_text = re.sub(r'\s+([\.\,\?\:])', r'\1', normalize_text)
+        # Pattern matching
+        if re.search(r'(\d[a-zA-Z]|[a-zA-Z]\d)', normalize_text) is None:
+            tokens = final_text.split()
+            normalize_text_meta = [
+                {
+                    'text': tokens[i],
+                    'start': text_meta[i]['start'],
+                    'end': text_meta[i]['end'],
+                }
+                for i in range(len(tokens))
+            ]
+            return normalize_text_meta
+
+        text = " ".join([token['text'] for token in text_meta])
+
         source_tokens = text.split()
-        norm_target_tokens = re.sub(r'\s+([\.\,\?\:])', r'\1', normalize_text).split()
+        norm_target_tokens = final_text.split()
         target_tokens = re.sub(r'\s+([\.\,\?\:])', r' ', normalize_text).strip().lower().split()
         matcher = SequenceMatcher(None, source_tokens, target_tokens)
         diffs = list(matcher.get_opcodes())
@@ -451,6 +461,10 @@ class GecBERTModel(object):
                             'end': text_meta[i1 + c]["end"],
                         }
                     )
+            elif tag == "delete":
+                normalize_text_meta.extend(text_meta[i1:i2])
+            elif tag == "insert":
+                warnings.warn("Unexpected insert tag, maybe something wrong happened")
             else:
                 start = text_meta[i1]['start']
                 end = text_meta[i2 - 1]['end']

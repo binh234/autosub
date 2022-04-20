@@ -12,9 +12,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from text_processing.vi.taggers.tokenize_and_classify import ClassifyFst
-from text_processing.vi.verbalizers.verbalize import VerbalizeFst
-from text_processing.vi.verbalizers.verbalize_final import VerbalizeFinalFst
+from text_processing.vi.taggers.tokenize_and_classify import (
+    ClassifyFst,
+)
+from text_processing.vi.verbalizers.verbalize import (
+    VerbalizeFst,
+)
+from text_processing.vi.verbalizers.verbalize_final import (
+    VerbalizeFinalFst,
+)
 
 import logging
 
@@ -25,7 +31,7 @@ try:
 except (ModuleNotFoundError, ImportError):
     logging.warning(
         "`pynini` is not installed ! \n"
-        "Please run the `nemo_text_processing/setup.sh` script"
+        "Please run the `text_processing/setup.sh` script"
         "prior to usage of this toolkit."
     )
 

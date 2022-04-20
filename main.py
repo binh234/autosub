@@ -11,7 +11,7 @@ segment_backend = "vad"
 
 normalizer = InverseNormalizer("vi")
 
-# print(normalizer.inverse_normalize("năm hai không hai mốt", verbose=True))
+print(normalizer.inverse_normalize("ngày ba mươi tháng tư năm hai không hai mốt", verbose=True))
 
 # model = HuggingFaceASRModel("pretrain/base", lm_path, vocab_path, cache_dir=cache_dir)
 model = SpeechbrainASRModel("pretrain/base", lm_path, vocab_path, cache_dir=cache_dir)
@@ -36,10 +36,19 @@ gector = GecBERTModel(
     min_words_cut=8,
 )
 
-gen = SubGenerator(file_path, model, normalizer, gector=gector, segment_backend=segment_backend)
-gen.create_sub()
-# gen.sync_sub()
-# gen.add_sub_to_video()
+gen = SubGenerator(model, normalizer, gector=gector)
+subtitle_paths = gen.create_sub(
+    file_path,
+    sub_format=["srt"],
+    segment_backend="vad",
+    classify_segment=True,
+    show_progress=True,
+    transcribe_music=False,
+)
+print(subtitle_paths)
+srt_path = subtitle_paths[0]
+gen.sync_sub(file_path, srt_path)
+gen.add_sub_to_video(file_path, srt_path)
 
 # gen = SubGenerator("sample/snews.mp4", model, gector, normalizer)
 # gen.create_sub()

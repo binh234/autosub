@@ -14,7 +14,12 @@
 # limitations under the License.
 
 
-from text_processing.vi.graph_utils import NEMO_CHAR, NEMO_SIGMA, GraphFst, delete_space
+from text_processing.vi.graph_utils import (
+    NEMO_CHAR,
+    NEMO_SIGMA,
+    GraphFst,
+    delete_space,
+)
 
 try:
     import pynini
@@ -36,9 +41,9 @@ class WhiteListFst(GraphFst):
         graph = (
             pynutil.delete("name:")
             + delete_space
-            + pynutil.delete("\"")
+            + pynutil.delete('"')
             + pynini.closure(NEMO_CHAR - " ", 1)
-            + pynutil.delete("\"")
+            + pynutil.delete('"')
         )
         graph = graph @ pynini.cdrewrite(pynini.cross(u"\u00A0", " "), "", "", NEMO_SIGMA)
         self.fst = graph.optimize()

@@ -187,7 +187,7 @@ class WordpieceIndexer(TokenIndexer[int]):
         return word
 
     def bpe_tokenize(self, text):
-        """ Tokenize a string."""
+        """Tokenize a string."""
         bpe_tokens = []
         for token in text.split():
             token = ''.join(self.byte_encoder[b] for b in token.encode('utf-8'))

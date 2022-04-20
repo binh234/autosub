@@ -14,7 +14,12 @@
 # limitations under the License.
 
 from text_processing.vi.utils import get_abs_path
-from text_processing.vi.graph_utils import GraphFst, delete_space, delete_extra_space, NEMO_ALPHA
+from text_processing.vi.graph_utils import (
+    GraphFst,
+    delete_space,
+    delete_extra_space,
+    NEMO_ALPHA,
+)
 
 
 try:
@@ -50,7 +55,9 @@ class MathFst(GraphFst):
         graph_cardinal = cardinal.graph_no_exception
         optional_graph_negative = pynini.closure(pynini.cross(pynini.union("âm", "trừ"), "-") + delete_space, 0, 1)
         optional_graph_power = pynini.closure(
-            delete_space + pynini.cross("bình phương", "²") | delete_space + pynini.cross("lập phương", "³"), 0, 1
+            delete_space + pynini.cross("bình phương", "²") | delete_space + pynini.cross("lập phương", "³"),
+            0,
+            1,
         )
 
         graph_digit = graph_digit | graph_zero
@@ -60,7 +67,9 @@ class MathFst(GraphFst):
             pynini.closure(graph_digit + delete_space, 1) + (graph_digit | graph_four | graph_five | graph_one),
         )
         optional_graph_fraction = pynini.closure(
-            delete_space + pynini.cross(pynini.union("chấm", "phẩy"), ".") + delete_space + graph_fraction, 0, 1
+            delete_space + pynini.cross(pynini.union("chấm", "phẩy"), ".") + delete_space + graph_fraction,
+            0,
+            1,
         )
         graph_decimal = graph_cardinal + optional_graph_fraction
 
@@ -80,6 +89,6 @@ class MathFst(GraphFst):
             + optional_graph_power
         )
 
-        graph = pynutil.insert("equation: \"") + graph_equation + pynutil.insert("\"")
+        graph = pynutil.insert('equation: "') + graph_equation + pynutil.insert('"')
         final_graph = self.add_tokens(graph)
         self.fst = final_graph.optimize()

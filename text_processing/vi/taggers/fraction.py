@@ -13,7 +13,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from text_processing.vi.graph_utils import GraphFst, delete_space, delete_extra_space
+from text_processing.vi.graph_utils import (
+    GraphFst,
+    delete_space,
+    delete_extra_space,
+)
 
 
 try:
@@ -43,9 +47,9 @@ class FractionFst(GraphFst):
         graph_cardinal = cardinal.graph_no_exception
         graph_four = pynini.cross("tư", "4")
 
-        numerator = pynutil.insert("numerator: \"") + graph_cardinal + pynutil.insert("\"")
+        numerator = pynutil.insert('numerator: "') + graph_cardinal + pynutil.insert('"')
         fraction_component = pynutil.delete(pynini.union("phần", "trên", "chia"))
-        denominator = pynutil.insert("denominator: \"") + (graph_cardinal | graph_four) + pynutil.insert("\"")
+        denominator = pynutil.insert('denominator: "') + (graph_cardinal | graph_four) + pynutil.insert('"')
 
         graph_fraction_component = numerator + delete_space + fraction_component + delete_extra_space + denominator
         self.graph_fraction_component = graph_fraction_component
@@ -55,7 +59,7 @@ class FractionFst(GraphFst):
         self.final_graph_wo_negative = graph
 
         optional_graph_negative = pynini.closure(
-            pynutil.insert("negative: ") + pynini.cross(pynini.union("âm", "trừ"), "\"true\"") + delete_extra_space,
+            pynutil.insert("negative: ") + pynini.cross(pynini.union("âm", "trừ"), '"true"') + delete_extra_space,
             0,
             1,
         )

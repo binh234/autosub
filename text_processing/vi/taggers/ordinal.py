@@ -14,7 +14,10 @@
 # limitations under the License.
 
 from text_processing.vi.utils import get_abs_path
-from text_processing.vi.graph_utils import delete_space, GraphFst
+from text_processing.vi.graph_utils import (
+    delete_space,
+    GraphFst,
+)
 
 try:
     import pynini
@@ -39,6 +42,6 @@ class OrdinalFst(GraphFst):
         graph = graph_digit
 
         self.graph = graph
-        final_graph = pynutil.insert("integer: \"") + graph_ordinal + delete_space + self.graph + pynutil.insert("\"")
+        final_graph = pynutil.insert('integer: "') + graph_ordinal + delete_space + self.graph + pynutil.insert('"')
         final_graph = self.add_tokens(final_graph)
         self.fst = final_graph.optimize()

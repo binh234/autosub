@@ -15,20 +15,40 @@
 
 import os
 
-from text_processing.vi.taggers.address import AddressFst
-from text_processing.vi.taggers.cardinal import CardinalFst
+from text_processing.vi.taggers.address import (
+    AddressFst,
+)
+from text_processing.vi.taggers.cardinal import (
+    CardinalFst,
+)
 from text_processing.vi.taggers.date import DateFst
-from text_processing.vi.taggers.decimal import DecimalFst
-from text_processing.vi.taggers.fraction import FractionFst
-from text_processing.vi.taggers.electronic import ElectronicFst
+from text_processing.vi.taggers.decimal import (
+    DecimalFst,
+)
+from text_processing.vi.taggers.fraction import (
+    FractionFst,
+)
+from text_processing.vi.taggers.electronic import (
+    ElectronicFst,
+)
 from text_processing.vi.taggers.math import MathFst
-from text_processing.vi.taggers.measure import MeasureFst
+from text_processing.vi.taggers.measure import (
+    MeasureFst,
+)
 from text_processing.vi.taggers.money import MoneyFst
-from text_processing.vi.taggers.ordinal import OrdinalFst
-from text_processing.vi.taggers.punctuation import PunctuationFst
-from text_processing.vi.taggers.telephone import TelephoneFst
+from text_processing.vi.taggers.ordinal import (
+    OrdinalFst,
+)
+from text_processing.vi.taggers.punctuation import (
+    PunctuationFst,
+)
+from text_processing.vi.taggers.telephone import (
+    TelephoneFst,
+)
 from text_processing.vi.taggers.time import TimeFst
-from text_processing.vi.taggers.whitelist import WhiteListFst
+from text_processing.vi.taggers.whitelist import (
+    WhiteListFst,
+)
 from text_processing.vi.taggers.word import WordFst
 from text_processing.vi.graph_utils import (
     GraphFst,

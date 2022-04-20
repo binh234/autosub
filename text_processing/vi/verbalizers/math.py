@@ -12,7 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from text_processing.vi.graph_utils import NEMO_NOT_QUOTE, GraphFst
+from text_processing.vi.graph_utils import (
+    NEMO_NOT_QUOTE,
+    GraphFst,
+)
 
 try:
     import pynini
@@ -31,6 +34,6 @@ class MathFst(GraphFst):
 
     def __init__(self):
         super().__init__(name="math", kind="verbalize")
-        equation_part = pynutil.delete("equation: \"") + pynini.closure(NEMO_NOT_QUOTE, 1) + pynutil.delete("\"")
+        equation_part = pynutil.delete('equation: "') + pynini.closure(NEMO_NOT_QUOTE, 1) + pynutil.delete('"')
         delete_tokens = self.delete_tokens(equation_part)
         self.fst = delete_tokens.optimize()

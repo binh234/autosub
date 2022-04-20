@@ -39,24 +39,24 @@ class DateFst(GraphFst):
         day = (
             pynutil.delete("day:")
             + delete_space
-            + pynutil.delete("\"")
+            + pynutil.delete('"')
             + pynini.closure(NEMO_NOT_QUOTE, 1)
-            + pynutil.delete("\"")
+            + pynutil.delete('"')
         )
         month = (
             pynutil.delete("month:")
             + delete_space
-            + pynutil.delete("\"")
+            + pynutil.delete('"')
             + pynini.closure(NEMO_NOT_QUOTE, 1)
-            + pynutil.delete("\"")
+            + pynutil.delete('"')
         )
         year = (
             pynutil.delete("year:")
             + delete_space
-            + pynutil.delete("\"")
+            + pynutil.delete('"')
             + pynini.closure(NEMO_NOT_QUOTE, 1)
             + delete_space
-            + pynutil.delete("\"")
+            + pynutil.delete('"')
         )
 
         # (day) month year
@@ -71,9 +71,9 @@ class DateFst(GraphFst):
             pynutil.delete("preserve_order:") + delete_space + pynutil.delete("true") + delete_space
             | pynutil.delete("field_order:")
             + delete_space
-            + pynutil.delete("\"")
+            + pynutil.delete('"')
             + NEMO_NOT_QUOTE
-            + pynutil.delete("\"")
+            + pynutil.delete('"')
             + delete_space
         )
 

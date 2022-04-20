@@ -14,7 +14,10 @@
 # limitations under the License.
 
 from text_processing.vi.utils import get_abs_path
-from text_processing.vi.graph_utils import GraphFst, delete_space
+from text_processing.vi.graph_utils import (
+    GraphFst,
+    delete_space,
+)
 
 try:
     import pynini
@@ -39,7 +42,7 @@ class TelephoneFst(GraphFst):
         last_digit = digit | pynini.cross("mốt", "1") | pynini.cross("tư", "4") | pynini.cross("lăm", "5")
 
         graph_number_part = pynini.closure(digit + delete_space, 2) + last_digit
-        number_part = pynutil.insert("number_part: \"") + graph_number_part + pynutil.insert("\"")
+        number_part = pynutil.insert('number_part: "') + graph_number_part + pynutil.insert('"')
 
         graph = number_part
         final_graph = self.add_tokens(graph)

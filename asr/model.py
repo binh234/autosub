@@ -1,8 +1,8 @@
 import functools
 import operator
 from speechbrain.pretrained import EncoderASR
-from transformers import Wav2Vec2ForCTC, Wav2Vec2Processor
-from pyctcdecode import Alphabet, BeamSearchDecoderCTC, LanguageModel, build_ctcdecoder
+from transformers import AutoModelForCTC, AutoProcessor
+from pyctcdecode import build_ctcdecoder
 import torch
 import numpy as np
 import time
@@ -197,8 +197,8 @@ class HuggingFaceASRModel(BaseASRModel):
         print("Loading model...")
         start = time.time()
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        self.processor = Wav2Vec2Processor.from_pretrained(model_path, cache_dir=cache_dir)
-        self.model = Wav2Vec2ForCTC.from_pretrained(model_path, cache_dir=cache_dir).eval().to(self.device)
+        self.processor = AutoProcessor.from_pretrained(model_path, cache_dir=cache_dir)
+        self.model = AutoModelForCTC.from_pretrained(model_path, cache_dir=cache_dir).eval().to(self.device)
         print("Model loaded successfully in %fs" % (time.time() - start))
 
         # Sanity check

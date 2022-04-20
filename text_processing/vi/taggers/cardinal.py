@@ -55,7 +55,7 @@ class CardinalFst(GraphFst):
         zero = pynini.cross(pynini.union("linh", "lẻ"), "0")
 
         optional_ten = pynini.closure(delete_space + graph_ten, 0, 1)
-        last_digit_exception = pynini.project(pynini.cross("năm", "5"), 'input')
+        last_digit_exception = pynini.project(pynini.cross("năm", "5"), "input")
         last_digit = pynini.union(
             (pynini.project(graph_digit, "input") - last_digit_exception.arcsort()) @ graph_digit,
             graph_one,
@@ -137,21 +137,24 @@ class CardinalFst(GraphFst):
         )
 
         graph = graph @ pynini.union(
-            pynutil.delete(pynini.closure("0")) + pynini.difference(NEMO_DIGIT, "0") + pynini.closure(NEMO_DIGIT), "0"
+            pynutil.delete(pynini.closure("0")) + pynini.difference(NEMO_DIGIT, "0") + pynini.closure(NEMO_DIGIT),
+            "0",
         )
 
         # don't convert cardinals from zero to nine inclusive
-        graph_exception = pynini.project(pynini.union(graph_digit, graph_zero), 'input')
+        graph_exception = pynini.project(pynini.union(graph_digit, graph_zero), "input")
 
         self.graph_no_exception = graph
 
         self.graph = (pynini.project(graph, "input") - graph_exception.arcsort()) @ graph
 
         optional_minus_graph = pynini.closure(
-            pynutil.insert("negative: ") + pynini.cross(pynini.union("âm", "trừ"), "\"-\"") + NEMO_SPACE, 0, 1
+            pynutil.insert("negative: ") + pynini.cross(pynini.union("âm", "trừ"), '"-"') + NEMO_SPACE,
+            0,
+            1,
         )
 
-        final_graph = optional_minus_graph + pynutil.insert("integer: \"") + self.graph + pynutil.insert("\"")
+        final_graph = optional_minus_graph + pynutil.insert('integer: "') + self.graph + pynutil.insert('"')
 
         final_graph = self.add_tokens(final_graph)
         self.fst = final_graph.optimize()
