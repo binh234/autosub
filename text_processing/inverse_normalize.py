@@ -36,9 +36,7 @@ class InverseNormalizer(Normalizer):
     def __init__(self, lang: str = 'en', cache_dir: str = None, overwrite_cache: bool = False):
         if lang == 'vi':
             from text_processing.vi.taggers.tokenize_and_classify import ClassifyFst
-            from text_processing.vi.verbalizers.verbalize_final import (
-                VerbalizeFinalFst,
-            )
+            from text_processing.vi.verbalizers.verbalize_final import VerbalizeFinalFst
         else:
             raise NotImplementedError
 

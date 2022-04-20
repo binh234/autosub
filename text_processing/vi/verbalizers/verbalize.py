@@ -13,40 +13,20 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from text_processing.vi.verbalizers.address import (
-    AddressFst,
-)
-from text_processing.vi.verbalizers.cardinal import (
-    CardinalFst,
-)
-from text_processing.vi.verbalizers.date import DateFst
-from text_processing.vi.verbalizers.decimal import (
-    DecimalFst,
-)
-from text_processing.vi.verbalizers.fraction import (
-    FractionFst,
-)
-from text_processing.vi.verbalizers.electronic import (
-    ElectronicFst,
-)
-from text_processing.vi.verbalizers.math import MathFst
-from text_processing.vi.verbalizers.measure import (
-    MeasureFst,
-)
-from text_processing.vi.verbalizers.money import (
-    MoneyFst,
-)
-from text_processing.vi.verbalizers.ordinal import (
-    OrdinalFst,
-)
-from text_processing.vi.verbalizers.telephone import (
-    TelephoneFst,
-)
-from text_processing.vi.verbalizers.time import TimeFst
-from text_processing.vi.verbalizers.whitelist import (
-    WhiteListFst,
-)
 from text_processing.vi.graph_utils import GraphFst
+from text_processing.vi.verbalizers.address import AddressFst
+from text_processing.vi.verbalizers.cardinal import CardinalFst
+from text_processing.vi.verbalizers.date import DateFst
+from text_processing.vi.verbalizers.decimal import DecimalFst
+from text_processing.vi.verbalizers.electronic import ElectronicFst
+from text_processing.vi.verbalizers.fraction import FractionFst
+from text_processing.vi.verbalizers.measure import MeasureFst
+from text_processing.vi.verbalizers.math import MathFst
+from text_processing.vi.verbalizers.money import MoneyFst
+from text_processing.vi.verbalizers.ordinal import OrdinalFst
+from text_processing.vi.verbalizers.telephone import TelephoneFst
+from text_processing.vi.verbalizers.time import TimeFst
+from text_processing.vi.verbalizers.whitelist import WhiteListFst
 
 
 class VerbalizeFst(GraphFst):
