@@ -1,3 +1,4 @@
+from typing import Dict
 import numpy as np
 from inaSpeechSegmenter import Segmenter
 from inaSpeechSegmenter.sidekit_mfcc import mfcc
@@ -23,7 +24,7 @@ def media2feats(waveform):
 
 
 class InaSegmenter(Segmenter):
-    instance = None
+    _cache: Dict[str, Segmenter] = {}
 
     def __init__(self, **kwargs):
         super(InaSegmenter, self).__init__(**kwargs)
@@ -50,8 +51,17 @@ class InaSegmenter(Segmenter):
         return self.segment_feats(mspec, loge, difflen, start_sec)
 
     @classmethod
-    def get_instance(cls):
-        if cls.instance is None:
-            cls.instance = InaSegmenter(detect_gender=False, batch_size=128)
+    def load(cls, batch_size=128, detect_gender=False, cache_model=True):
+        """
+        In some instances you may want to load the same model twice
+        This factory provides a cache so that you don't actually have to load the model twice.
+        """
+        key = f'{batch_size}_{detect_gender}'
+        if key in cls._cache:
+            return cls._cache[key]
+        
+        model = InaSegmenter(batch_size=batch_size, detect_gender=detect_gender)
+        if cache_model:
+            cls._cache[key] = model
 
-        return cls.instance
+        return model

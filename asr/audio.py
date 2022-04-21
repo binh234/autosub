@@ -31,11 +31,11 @@ class AudioFile:
         self.rewind()
         media_buffer = self.wav_file.readframes(self.wav_file.getnframes())
         media = pcm_to_np(media_buffer, self.audio_format).squeeze()
-        segmenter = InaSegmenter.get_instance()
+        segmenter = InaSegmenter.load()
         segmentation = segmenter(media)
 
         if classify == True and self.audify_model is None:
-            self.audify_model = AudifyModel.get_instance()
+            self.audify_model = AudifyModel.load()
 
         for (label, time_start, time_end) in segmentation:
             tag = label
@@ -55,7 +55,7 @@ class AudioFile:
 
     def _vad_split(self, aggressiveness=3, classify=True):
         if classify == True and self.audify_model is None:
-            self.audify_model = AudifyModel.get_instance()
+            self.audify_model = AudifyModel.load()
 
         frames = read_frames_from_file(self.wav_file)
         segments = vad_split(frames, aggressiveness=aggressiveness)

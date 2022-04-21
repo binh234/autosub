@@ -1,6 +1,7 @@
 import os
 import torch
 import warnings
+from typing import Dict
 from speechbrain.pretrained import EncoderClassifier
 from utils import DEFAULT_TEMP_DIR
 
@@ -12,7 +13,7 @@ _DEFAULT_SAVE_PATH = os.path.join(DEFAULT_TEMP_DIR, 'audify')
 
 
 class AudifyModel(torch.nn.Module):
-    instance_dict = {}
+    _cache: Dict[str, torch.nn.Module] = {}
 
     def __init__(self, model_path, save_path):
         super(AudifyModel, self).__init__()
@@ -25,10 +26,18 @@ class AudifyModel(torch.nn.Module):
         )
 
     @classmethod
-    def get_instance(cls, model_path=_DEFAULT_CHECKPOINT, save_path=_DEFAULT_SAVE_PATH):
-        if model_path not in cls.instance_dict:
-            cls.instance_dict[model_path] = AudifyModel(model_path, save_path)
-        return cls.instance_dict[model_path]
+    def load(cls, model_path=_DEFAULT_CHECKPOINT, save_path=_DEFAULT_SAVE_PATH, cache_model=True):
+        """
+        In some instances you may want to load the same model twice
+        This factory provides a cache so that you don't actually have to load the model twice.
+        """
+        if model_path not in cls._cache:
+            return cls._cache[model_path]
+        
+        model = AudifyModel(model_path, save_path)
+        if cache_model:
+            cls._cache[model_path] = model
+        return model
 
     def forward(self, wavs, wav_lens=None):
         """Runs the classification"""
