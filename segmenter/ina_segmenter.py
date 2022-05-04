@@ -59,7 +59,7 @@ class InaSegmenter(Segmenter):
         key = f'{batch_size}_{detect_gender}'
         if key in cls._cache:
             return cls._cache[key]
-        
+
         model = InaSegmenter(batch_size=batch_size, detect_gender=detect_gender)
         if cache_model:
             cls._cache[key] = model

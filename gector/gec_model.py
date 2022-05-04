@@ -1,27 +1,16 @@
-"""Wrapper of AllenNLP model. Fixes errors based on model predictions"""
+"""Wrapper of Seq2Labels model. Fixes errors based on model predictions"""
+from collections import defaultdict
 from difflib import SequenceMatcher
 import logging
-import os
-import sys
 import re
 from time import time
 import warnings
 
 import torch
-from allennlp.data.dataset import Batch
-from allennlp.data.fields import TextField
-from allennlp.data.instance import Instance
-from allennlp.data.tokenizers import Token
-from allennlp.data.vocabulary import Vocabulary
-from allennlp.modules.text_field_embedders import BasicTextFieldEmbedder
-from allennlp.nn import util
-
-from gector.bert_token_embedder import PretrainedBertEmbedder
-from gector.seq2labels_model import Seq2Labels
-from gector.tokenizer_indexer import PretrainedBertIndexer
-from gector.wordpiece_indexer import PretrainedBertIndexer as WordpieceIndexer
-from utils.helpers import PAD, UNK, get_target_sent_by_edits, START_TOKEN
-from utils.helpers import get_weights_name
+from vocabulary import Vocabulary
+from transformers import AutoTokenizer
+from modeling_seq2labels import Seq2LabelsModel
+from utils.helpers import PAD, UNK, START_TOKEN, get_target_sent_by_edits, get_weights_name
 
 logging.getLogger("werkzeug").setLevel(logging.ERROR)
 logger = logging.getLogger(__file__)
@@ -74,6 +63,7 @@ class GecBERTModel(object):
         self.min_words_cut = min_words_cut
         self.stride = chunk_size - overlap_size
         self.punc_dict = punc_dict
+        self.punc_str = '[' + ''.join([f'\{x}' for x in punc_dict]) + ']'
         # set training parameters and operations
 
         self.indexers = []
@@ -83,13 +73,7 @@ class GecBERTModel(object):
                 model_name, special_tokens_fix = self._get_model_data(model_path)
             weights_name = get_weights_name(model_name, lowercase_tokens)
             self.indexers.append(self._get_indexer(weights_name, special_tokens_fix))
-            model = Seq2Labels(
-                vocab=self.vocab,
-                text_field_embedder=self._get_embbeder(weights_name, special_tokens_fix),
-                confidence=self.confidence,
-            )
-            model.load_state_dict(torch.load(model_path, map_location="cpu"))
-            model = model.to(self.device)
+            model = Seq2LabelsModel.from_pretrained(model_path).to(self.device)
             model.eval()
             self.models.append(model)
 
@@ -99,33 +83,22 @@ class GecBERTModel(object):
         tr_model, stf = model_name.split('_')[:2]
         return tr_model, int(stf)
 
-    def _restore_model(self, input_path):
-        if os.path.isdir(input_path):
-            print("Model could not be restored from directory", file=sys.stderr)
-            filenames = []
-        else:
-            filenames = [input_path]
-        for model_path in filenames:
-            try:
-                loaded_model = torch.load(model_path)
-                # else:
-                #     loaded_model = torch.load(model_path,
-                #                               map_location=lambda storage,
-                #                                                   loc: storage)
-            except:
-                print(f"{model_path} is not valid model", file=sys.stderr)
-            own_state = self.model.state_dict()
-            for name, weights in loaded_model.items():
-                if name not in own_state:
-                    continue
-                try:
-                    if len(filenames) == 1:
-                        own_state[name].copy_(weights)
-                    else:
-                        own_state[name] += weights
-                except RuntimeError:
-                    continue
-        print("Model is restored", file=sys.stderr)
+    def _get_indexer(self, weights_name, special_tokens_fix):
+        tokenizer = AutoTokenizer.from_pretrained(
+            weights_name, do_basic_tokenize=False, do_lower_case=self.lowercase_tokens, model_max_length=1024
+        )
+        # to adjust all tokenizers
+        if hasattr(tokenizer, 'encoder'):
+            tokenizer.vocab = tokenizer.encoder
+        if hasattr(tokenizer, 'sp_model'):
+            tokenizer.vocab = defaultdict(lambda: 1)
+            for i in range(tokenizer.sp_model.get_piece_size()):
+                tokenizer.vocab[tokenizer.sp_model.id_to_piece(i)] = i
+
+        if special_tokens_fix:
+            tokenizer.add_tokens([START_TOKEN])
+            tokenizer.vocab[START_TOKEN] = len(tokenizer) - 1
+        return tokenizer
 
     def split_chunks(self, batch):
         # return batch pairs of indices
@@ -216,7 +189,7 @@ class GecBERTModel(object):
         t11 = time()
         predictions = []
         for batch, model in zip(batches, self.models):
-            batch = util.move_to_device(batch.as_tensor_dict(), 0 if self.device != torch.device("cpu") else -1)
+            batch = batch.to(self.device)
             with torch.no_grad():
                 prediction = model.forward(**batch)
             predictions.append(prediction)
@@ -249,40 +222,6 @@ class GecBERTModel(object):
 
         return start_pos - 1, end_pos - 1, sugg_token_clear, prob
 
-    def _get_embbeder(self, weights_name, special_tokens_fix):
-        embedders = {
-            'bert': PretrainedBertEmbedder(
-                pretrained_model=weights_name,
-                requires_grad=False,
-                top_layer_only=True,
-                special_tokens_fix=special_tokens_fix,
-            )
-        }
-        text_field_embedder = BasicTextFieldEmbedder(
-            token_embedders=embedders,
-            embedder_to_indexer_map={"bert": ["bert", "bert-offsets"]},
-            allow_unmatched_keys=True,
-        )
-        return text_field_embedder
-
-    def _get_indexer(self, weights_name, special_tokens_fix):
-        if "phobert" in weights_name:
-            bert_token_indexer = WordpieceIndexer(
-                pretrained_model=weights_name,
-                max_pieces_per_token=5,
-                do_lowercase=self.lowercase_tokens,
-                use_starting_offsets=True,
-                special_tokens_fix=special_tokens_fix,
-            )
-        else:
-            bert_token_indexer = PretrainedBertIndexer(
-                pretrained_model=weights_name,
-                do_lowercase=self.lowercase_tokens,
-                max_pieces_per_token=5,
-                special_tokens_fix=special_tokens_fix,
-            )
-        return {'bert': bert_token_indexer}
-
     def preprocess(self, token_batch):
         seq_lens = [len(sequence) for sequence in token_batch if sequence]
         if not seq_lens:
@@ -290,22 +229,38 @@ class GecBERTModel(object):
         max_len = min(max(seq_lens), self.max_len)
         batches = []
         for indexer in self.indexers:
-            batch = []
-            for sequence in token_batch:
-                tokens = sequence[:max_len]
-                tokens = [Token(token) for token in ['$START'] + tokens]
-                batch.append(Instance({'tokens': TextField(tokens, indexer)}))
-            batch = Batch(batch)
-            batch.index_instances(self.vocab)
+            token_batch = [[START_TOKEN] + sequence[:max_len] for sequence in token_batch]
+            batch = indexer(
+                token_batch,
+                return_tensors="pt",
+                padding=True,
+                is_split_into_words=True,
+                truncation=True,
+                add_special_tokens=False,
+            )
+            offset_batch = []
+            for i in range(len(token_batch)):
+                word_ids = batch.word_ids(batch_index=i)
+                offsets = [0]
+                for i in range(1, len(word_ids)):
+                    if word_ids[i] != word_ids[i - 1]:
+                        offsets.append(i)
+                offset_batch.append(torch.LongTensor(offsets))
+
+            batch["input_offsets"] = torch.nn.utils.rnn.pad_sequence(
+                offset_batch, batch_first=True, padding_value=0
+            ).to(torch.long)
+
             batches.append(batch)
 
         return batches
 
     def _convert(self, data):
-        all_class_probs = torch.zeros_like(data[0]['class_probabilities_labels'])
+        all_class_probs = torch.zeros_like(data[0]['logits'])
         error_probs = torch.zeros_like(data[0]['max_error_probability'])
         for output, weight in zip(data, self.model_weights):
-            all_class_probs += weight * output['class_probabilities_labels'] / sum(self.model_weights)
+            class_probabilities_labels = torch.softmax(output['logits'], dim=-1)
+            all_class_probs += weight * class_probabilities_labels / sum(self.model_weights)
             error_probs += weight * output['max_error_probability'] / sum(self.model_weights)
 
         max_vals = torch.max(all_class_probs, dim=-1)
@@ -407,7 +362,7 @@ class GecBERTModel(object):
         else:
             final_batch = [" ".join(x) for x in final_batch]
         if merge_punc:
-            final_batch = [re.sub(r'\s+([\.\,\?\:])', r'\1', x) for x in final_batch]
+            final_batch = [re.sub(r'\s+(%s)' % self.punc_str, r'\1', x) for x in final_batch]
 
         return final_batch, total_updates
 
@@ -426,7 +381,7 @@ class GecBERTModel(object):
 
     def perfect_matching(self, text_meta, normalize_text):
         normalize_text_meta = []
-        final_text = re.sub(r'\s+([\.\,\?\:])', r'\1', normalize_text)
+        final_text = re.sub(r'\s+(%s)' % self.punc_str, r'\1', normalize_text)
         # Pattern matching
         if re.search(r'(\d[a-zA-Z]|[a-zA-Z]\d)', normalize_text) is None:
             tokens = final_text.split()
@@ -444,7 +399,7 @@ class GecBERTModel(object):
 
         source_tokens = text.split()
         norm_target_tokens = final_text.split()
-        target_tokens = re.sub(r'\s+([\.\,\?\:])', r' ', normalize_text).strip().lower().split()
+        target_tokens = re.sub(r'\s+(%s)' % self.punc_str, r' ', normalize_text).strip().lower().split()
         matcher = SequenceMatcher(None, source_tokens, target_tokens)
         diffs = list(matcher.get_opcodes())
 

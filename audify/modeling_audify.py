@@ -33,7 +33,7 @@ class AudifyModel(torch.nn.Module):
         """
         if model_path not in cls._cache:
             return cls._cache[model_path]
-        
+
         model = AudifyModel(model_path, save_path)
         if cache_model:
             cls._cache[model_path] = model

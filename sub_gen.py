@@ -81,9 +81,11 @@ class SubGenerator:
 
         if not os.path.exists(file_path):
             raise ValueError("File does not exist: %s" % file_path)
-        
+
         if classify_segment and segment_backend == 'vad':
-            warnings.warn("Classify segment should be used with ina backend, otherwise the transcript quality might be downgraded")
+            warnings.warn(
+                "Classify segment should be used with ina backend, otherwise the transcript quality might be downgraded"
+            )
 
         file_name, file_ext = os.path.split(file_path)[-1].split(".")
         file_id = uuid.uuid4().hex
