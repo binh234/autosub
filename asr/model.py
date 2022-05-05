@@ -18,9 +18,6 @@ STRIDES = 20
 
 
 class BaseASRModel(torch.nn.Module):
-    def __init__(self, *args, **kwargs):
-        super(BaseASRModel, self).__init__()
-
     def build_lm(self, tokenizer, vocab_path=None):
         unigrams = None
         if vocab_path is not None:

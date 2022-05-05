@@ -1,11 +1,8 @@
 argparse
-django
-faker
 ffsubsync
 inaSpeechSegmenter
 jiwer
 numpy
-overrides==4.1.2
 pyctcdecode==0.2.0
 pynini
 python-Levenshtein==0.12.2

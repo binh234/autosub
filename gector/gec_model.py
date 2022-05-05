@@ -28,9 +28,7 @@ class GecBERTModel(object):
         lowercase_tokens=False,
         log=False,
         iterations=3,
-        model_name='roberta',
         special_tokens_fix=True,
-        is_ensemble=False,
         min_error_probability=0.0,
         confidence=0,
         resolve_cycles=False,
@@ -62,9 +60,6 @@ class GecBERTModel(object):
                 Max iterations to run during inference.
             special_tokens_fix (`bool`, defaults to True):
                Whether to fix problem with [CLS], [SEP] tokens tokenization.
-            is_ensemble (`bool`, defaults to False):
-                Whether to do ensembling. Model must be stored in format {model_name}_{special_tokens_fix}.
-                Ex: `roberta_1.th`
             min_error_probability (`float`, defaults to `0.0`):
                 Minimum probability for each action to apply.
             confidence (`float`, defaults to `0.0`):
@@ -111,19 +106,13 @@ class GecBERTModel(object):
         self.indexers = []
         self.models = []
         for model_path in model_paths:
-            if is_ensemble:
-                model_name, special_tokens_fix = self._get_model_data(model_path)
-            weights_name = get_weights_name(model_name, lowercase_tokens)
-            self.indexers.append(self._get_indexer(weights_name, special_tokens_fix))
-            model = Seq2LabelsModel.from_pretrained(model_path).to(self.device)
-            model.eval()
+            model = Seq2LabelsModel.from_pretrained(model_path)
+            config = model.config
+            model_name = config.pretrained_name_or_path
+            special_tokens_fix = config.special_tokens_fix
+            self.indexers.append(self._get_indexer(model_name, special_tokens_fix))
+            model.eval().to(self.device)
             self.models.append(model)
-
-    @staticmethod
-    def _get_model_data(model_path):
-        model_name = model_path.split('/')[-1]
-        tr_model, stf = model_name.split('_')[:2]
-        return tr_model, int(stf)
 
     def _get_indexer(self, weights_name, special_tokens_fix):
         tokenizer = AutoTokenizer.from_pretrained(
