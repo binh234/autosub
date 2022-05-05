@@ -7,9 +7,9 @@ from time import time
 import warnings
 
 import torch
-from vocabulary import Vocabulary
 from transformers import AutoTokenizer
-from modeling_seq2labels import Seq2LabelsModel
+from gector.modeling_seq2labels import Seq2LabelsModel
+from gector.vocabulary import Vocabulary
 from utils.helpers import PAD, UNK, START_TOKEN, get_target_sent_by_edits, get_weights_name
 
 logging.getLogger("werkzeug").setLevel(logging.ERROR)
@@ -29,7 +29,7 @@ class GecBERTModel(object):
         log=False,
         iterations=3,
         model_name='roberta',
-        special_tokens_fix=1,
+        special_tokens_fix=True,
         is_ensemble=False,
         min_error_probability=0.0,
         confidence=0,
@@ -40,6 +40,48 @@ class GecBERTModel(object):
         min_words_cut=6,
         punc_dict={':', ".", ",", "?"},
     ):
+        r"""
+        Args:
+            vocab_path (`str`):
+                Path to vocabulary directory.
+            model_paths (`List[str]`):
+                List of model paths.
+            weights (`int`, *Optional*, defaults to None):
+                Weights of each model. Only relevant if `is_ensemble is True`.
+            device (`int`, *Optional*, defaults to None):
+                Device to load model. If not set, device will be automatically choose.
+            max_len (`int`, defaults to 64):
+                Max sentence length to be processed (all longer will be truncated).
+            min_len (`int`, defaults to 3):
+                Min sentence length to be processed (all shorted will be returned w/o changes).
+            lowercase_tokens (`bool`, defaults to False):
+                Whether to lowercase tokens.
+            log (`bool`, defaults to False):
+                Whether to enable logging.
+            iterations (`int`, defaults to 3):
+                Max iterations to run during inference.
+            special_tokens_fix (`bool`, defaults to True):
+               Whether to fix problem with [CLS], [SEP] tokens tokenization.
+            is_ensemble (`bool`, defaults to False):
+                Whether to do ensembling. Model must be stored in format {model_name}_{special_tokens_fix}.
+                Ex: `roberta_1.th`
+            min_error_probability (`float`, defaults to `0.0`):
+                Minimum probability for each action to apply.
+            confidence (`float`, defaults to `0.0`):
+                How many probability to add to $KEEP token.
+            split_chunk (`bool`, defaults to False):
+                Whether to split long sentences to multiple segments of `chunk_size`.
+                !Warning: if `chunk_size > max_len`, each segment will be truncate to `max_len`.
+            chunk_size (`int`, defaults to 48):
+                Length of each segment (in words). Only relevant if `split_chunk is True`.
+            overlap_size (`int`, defaults to 12):
+                Overlap size (in words) between two consecutive segments. Only relevant if `split_chunk is True`.
+            min_words_cut (`int`, defaults to 6):
+                Minimun number of words to be cut while merging two consecutive segments.
+                Only relevant if `split_chunk is True`.
+            punc_dict (List[str], defaults to `{':', ".", ",", "?"}`):
+                List of punctuations.
+        """
         self.model_weights = list(map(float, weights)) if weights else [1] * len(model_paths)
         self.device = (
             torch.device("cuda" if torch.cuda.is_available() else "cpu") if device is None else torch.device(device)

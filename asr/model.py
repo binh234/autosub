@@ -7,7 +7,6 @@ import torch
 import numpy as np
 import time
 import tqdm
-from multiprocessing import Pool
 import warnings
 
 from asr.audio import AudioFile
@@ -178,6 +177,25 @@ class HuggingFaceASRModel(BaseASRModel):
         hot_words=[],
         **kwargs,
     ):
+        r"""
+        Args:
+            model_path (`Union[str, os.PathLike]`):
+                Path to pretrained model.
+            lm_path (`Union[str, os.PathLike]`, *Optional*):
+                Path to language model file.
+            vocab_path (`Union[str, os.PathLike]`, *Optional*):
+                Path to vocabulary file.
+            cache_dir (`Union[str, os.PathLike]`, *optional*):
+                Path to a directory in which a downloaded pretrained model configuration should be cached if the
+                standard cache should not be used.
+            sampling_rate (`int`, defaults to 16000):
+                Sampling rate of audio inputs.
+            chunk_size (`float`, defaults to 20):
+                Split long audio to multiple segments of `chunk_size` (in seconds) to avoid OOM.
+            context_size (`float`, defaults to 2.5):
+                Context length (in seconds) to added in each audio chunk for smoother recognition.
+            hot_words (List[str], *Optional*):
+        """
         super(HuggingFaceASRModel, self).__init__()
         self.model_path = model_path
         self.lm_path = lm_path
@@ -262,6 +280,26 @@ class SpeechbrainASRModel(BaseASRModel):
         hot_words=[],
         **kwargs,
     ):
+        r"""
+        Args:
+            model_path (`Union[str, os.PathLike]`):
+                Path to pretrained model.
+            lm_path (`Union[str, os.PathLike]`, *Optional*):
+                Path to language model file.
+            vocab_path (`Union[str, os.PathLike]`, *Optional*):
+                Path to vocabulary file.
+            cache_dir (`Union[str, os.PathLike]`, *optional*):
+                Path to a directory in which a downloaded pretrained model configuration should be cached if the
+                standard cache should not be used.
+            sampling_rate (`int`, defaults to 16000):
+                Sampling rate of audio inputs.
+            chunk_size (`float`, defaults to 20):
+                Split long audio to multiple segments of `chunk_size` (in seconds) to avoid OOM.
+            context_size (`float`, defaults to 2.5):
+                Context length (in seconds) to added in each audio chunk for smoother recognition.
+            hot_words (List[str], *Optional*):
+                Improve domain specificity by adding important contextual words ("hotwords") during inference.
+        """
         super(SpeechbrainASRModel, self).__init__()
         self.model_path = model_path
         self.lm_path = lm_path
