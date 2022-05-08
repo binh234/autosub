@@ -36,6 +36,13 @@ gector = GecBERTModel(
     min_words_cut=8,
 )
 
+# Recomend_parameters
+# (segment_backend='vad', classify_segment=False)
+# (segment_backend='vad', classify_segment=True, transcribe_music=True)
+# # `Ina` backend may misclassify for speech over noise segments (accuracy around 94%)
+# (segment_backend='ina', classify_segment=True, transcribe_music=True)
+# # a bit downgrade in quality for audios that have many `speech over music` segments like films or gameshows
+# (segment_backend='ina', classify_segment=True, transcribe_music=False)
 gen = SubGenerator(model, normalizer, gector=gector)
 subtitle_paths = gen.create_sub(
     file_path,
