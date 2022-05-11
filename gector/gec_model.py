@@ -28,7 +28,6 @@ class GecBERTModel(object):
         lowercase_tokens=False,
         log=False,
         iterations=3,
-        special_tokens_fix=True,
         min_error_probability=0.0,
         confidence=0,
         resolve_cycles=False,
@@ -42,7 +41,7 @@ class GecBERTModel(object):
         Args:
             vocab_path (`str`):
                 Path to vocabulary directory.
-            model_paths (`List[str]`):
+            model_paths (`Union[str, List[str]]`):
                 List of model paths.
             weights (`int`, *Optional*, defaults to None):
                 Weights of each model. Only relevant if `is_ensemble is True`.
@@ -77,6 +76,8 @@ class GecBERTModel(object):
             punc_dict (List[str], defaults to `{':', ".", ",", "?"}`):
                 List of punctuations.
         """
+        if isinstance(model_paths, str):
+            model_paths = [model_paths]
         self.model_weights = list(map(float, weights)) if weights else [1] * len(model_paths)
         self.device = (
             torch.device("cuda" if torch.cuda.is_available() else "cpu") if device is None else torch.device(device)
@@ -292,7 +293,10 @@ class GecBERTModel(object):
         for output, weight in zip(data, self.model_weights):
             class_probabilities_labels = torch.softmax(output['logits'], dim=-1)
             all_class_probs += weight * class_probabilities_labels / sum(self.model_weights)
-            error_probs += weight * output['max_error_probability'] / sum(self.model_weights)
+            class_probabilities_d = torch.softmax(output['detect_logits'], dim=-1)
+            error_probs_d = class_probabilities_d[:, :, self.incorr_index]
+            incorr_prob = torch.max(error_probs_d, dim=-1)[0]
+            error_probs += weight * incorr_prob / sum(self.model_weights)
 
         max_vals = torch.max(all_class_probs, dim=-1)
         probs = max_vals[0].tolist()

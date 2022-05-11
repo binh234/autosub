@@ -16,19 +16,16 @@ print(normalizer.inverse_normalize("ngày ba mươi tháng tư năm hai không h
 # model = HuggingFaceASRModel("pretrain/base", lm_path, vocab_path, cache_dir=cache_dir)
 model = SpeechbrainASRModel("pretrain/base", lm_path, vocab_path, cache_dir=cache_dir)
 gector = GecBERTModel(
-    vocab_path="pretrain/phobert/vocabulary",
-    model_paths=["pretrain/phobert/model.th"],
+    vocab_path="pretrain/vibert/vocabulary",
+    model_paths=["pretrain/vibert"],
     device=None,
     max_len=64,
     min_len=3,
     iterations=3,
     min_error_probability=0.2,
     lowercase_tokens=False,
-    model_name='vinai/phobert-base',
-    special_tokens_fix=1,
     log=False,
     confidence=0,
-    is_ensemble=False,
     weights=None,
     split_chunk=True,
     chunk_size=48,
