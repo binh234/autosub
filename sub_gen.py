@@ -121,7 +121,7 @@ class SubGenerator:
                 "When using `vad` backend, you should set `classify_segment=True and transcribe_music=True`, otherwise the transcript quality might be downgraded"
             )
 
-        file_name, file_ext = os.path.split(file_path)[-1].split(".")
+        file_name, file_ext = os.path.split(file_path)[-1].rsplit(".", 1)
         file_id = uuid.uuid4().hex
         temp_path = os.path.join(self.temp_dir, file_id + ".wav")
         output_file_handle_dict = {}
@@ -349,7 +349,7 @@ class SubGenerator:
                 "When using `vad` backend, you should set `classify_segment=True and transcribe_music=True`, otherwise the transcript quality might be downgraded"
             )
 
-        file_name, file_ext = os.path.split(file_path)[-1].split(".")
+        file_name, file_ext = os.path.split(file_path)[-1].rsplit(".", 1)
         file_id = uuid.uuid4().hex
         temp_path = os.path.join(self.temp_dir, file_id + ".wav")
 
@@ -447,8 +447,8 @@ class SubGenerator:
         if output_path is None or output_path == subtitle_path:
             output_path = file_name + "_sub" + file_ext
             overwrite = True
-        if file_ext not in VIDEO_EXT:
-            raise ValueError(f"Only supported for videoof format {VIDEO_EXT}")
+        if file_ext[1:] not in VIDEO_EXT:
+            raise ValueError(f"Only supported for video format: {VIDEO_EXT}")
         cmd = f"ffmpeg -loglevel quiet -i {file_path} -i {subtitle_path} -y -c copy -c:s mov_text {output_path}"
         os.system(cmd)
 

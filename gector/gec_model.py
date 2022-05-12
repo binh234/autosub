@@ -87,6 +87,7 @@ class GecBERTModel(object):
         self.lowercase_tokens = lowercase_tokens
         self.min_error_probability = min_error_probability
         self.vocab = Vocabulary.from_files(vocab_path)
+        self.incorr_index = self.vocab.get_token_index("INCORRECT", "d_tags")
         self.log = log
         self.iterations = iterations
         self.confidence = confidence
