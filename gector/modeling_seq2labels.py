@@ -121,5 +121,5 @@ class Seq2LabelsModel(BertPreTrainedModel):
             detect_logits=logits_d,
             hidden_states=outputs.hidden_states,
             attentions=outputs.attentions,
-            max_error_probability=torch.ones(logits.size(0)),
+            max_error_probability=torch.ones(logits.size(0), device=logits.device),
         )
