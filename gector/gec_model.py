@@ -1,4 +1,5 @@
 """Wrapper of Seq2Labels model. Fixes errors based on model predictions"""
+from audioop import add
 from collections import defaultdict
 from difflib import SequenceMatcher
 import logging
@@ -360,7 +361,7 @@ class GecBERTModel(object):
             all_results.append(get_target_sent_by_edits(tokens, edits))
         return all_results
 
-    def handle_batch(self, full_batch, merge_punc=True):
+    def handle_batch(self, full_batch, merge_punc=True, add_punc=True):
         """
         Handle batch of requests.
         """
@@ -397,17 +398,19 @@ class GecBERTModel(object):
             final_batch = [self.merge_chunks(final_batch[start:end]) for (start, end) in indices]
         else:
             final_batch = [" ".join(x) for x in final_batch]
-        if merge_punc:
+        if not add_punc:
+            final_batch = [re.sub(r'\s+(%s)' % self.punc_str, '', x) for x in final_batch]
+        elif merge_punc:
             final_batch = [re.sub(r'\s+(%s)' % self.punc_str, r'\1', x) for x in final_batch]
 
         return final_batch, total_updates
 
-    def handle_batch_with_metadata(self, full_batch_meta):
+    def handle_batch_with_metadata(self, full_batch_meta, add_punc=True):
         """
         Handle batch of requests and also return metadata after processing.
         """
         full_batch = [[token['text'] for token in batch] for batch in full_batch_meta]
-        final_batch, total_updates = self.handle_batch(full_batch, merge_punc=False)
+        final_batch, total_updates = self.handle_batch(full_batch, merge_punc=False, add_punc=add_punc)
         final_batch_meta = []
 
         for normalize_text, meta in zip(final_batch, full_batch_meta):

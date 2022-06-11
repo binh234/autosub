@@ -77,12 +77,17 @@ class CardinalFst(GraphFst):
             + delete_space
             + pynini.union(
                 graph_teen,
-                graph_ties + optional_ten + delete_space + last_digit,
+                graph_ties + delete_space + graph_ten + delete_space + last_digit,
+                graph_ties + delete_space + pynini.union(graph_one, graph_four, graph_five),
                 graph_ties + delete_space + graph_ten + pynutil.insert("0"),
                 zero + delete_space + (graph_digit | graph_four),
             )
         )
-        graph_hundred_component = graph_hundred_ties_component | (pynutil.insert("00") + delete_space + graph_digit)
+        graph_hundred_component = pynini.union(
+            graph_hundred_ties_component,
+            graph_ties + delete_space + graph_digit,
+            pynutil.insert("00") + delete_space + graph_digit
+        )
 
         graph_hundred_component_at_least_one_none_zero_digit = graph_hundred_component @ (
             pynini.closure(NEMO_DIGIT) + (NEMO_DIGIT - "0") + pynini.closure(NEMO_DIGIT)

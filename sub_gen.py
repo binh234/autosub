@@ -12,35 +12,11 @@ VIDEO_EXT = ['mp4', 'ogg', 'm4v', 'm4a', 'webm', 'flv', 'amv', 'avi']
 AUDIO_EXT = ['mp3', 'flac', 'wav', 'aac', 'm4a', 'weba', 'sdt']
 
 
-class FileGenObject(object):
-    def __init__(self, file_path, sub_format=['srt'], output_directory="./temp", temp_dir=DEFAULT_TEMP_DIR):
-        self.file_path = file_path
-        if temp_dir is None:
-            temp_dir = tempfile.mkdtemp()
-        self.temp_dir = temp_dir
-        self.temp_path = os.path.join(self.temp_dir, self.file_name + ".wav")
-
-        if self.file_ext in VIDEO_EXT:
-            self.is_video = True
-            extract_audio(self.file_path, self.temp_path)
-        elif self.file_ext in AUDIO_EXT:
-            self.is_video = False
-            convert_audio(self.file_path, self.temp_path)
-        else:
-            raise ValueError("Extension mismatch")
-
-        self.sub_format = sub_format
-        if output_directory is None:
-            output_directory = self.temp_dir
-        self.output_directory = output_directory
-        self.output_file_handle_dict = {}
-
-
 class SubGenerator:
     def __init__(
         self,
         asr_model,
-        normalizer,
+        normalizer=None,
         gector=None,
         src_lang='vi',
     ):
@@ -49,17 +25,18 @@ class SubGenerator:
         self.allow_tags = {"speech", "male", "female", "noisy_speech", "music"}
         self.src_lang = src_lang
         self.model = asr_model
-        self.itn = normalizer
+        self.normalizer = normalizer
         self.gector = gector
         if gector is not None:
             self.max_len = gector.max_len * 2
         else:
             self.max_len = 32
 
-    def post_process(self, tokens):
-        final_tokens = self.itn.inverse_normalize_with_metadata(tokens, verbose=False)
+    def post_process(self, tokens, auto_punc=True):
+        if self.normalizer:
+            final_tokens = self.normalizer.inverse_normalize_with_metadata(tokens, verbose=False)
         if self.gector:
-            final_batch, _ = self.gector.handle_batch_with_metadata([final_tokens])
+            final_batch, _ = self.gector.handle_batch_with_metadata([final_tokens], add_punc=auto_punc)
             final_tokens = final_batch[0]
 
         return final_tokens
@@ -73,6 +50,7 @@ class SubGenerator:
         max_words=12,
         sub_format=['srt'],
         output_directory="./temp",
+        auto_punc=True,
         segment_backend='vad',
         classify_segment=False,
         show_progress=False,
@@ -94,6 +72,8 @@ class SubGenerator:
                 Subtitle format to generate, available formats are txt, srt, and vtt
             output_directory (`str`, defaults to `./temp`):
                 Output directory to store subtitle files.
+            auto_punc (`bool`, defaults to True):
+                Whether to auto punctuation for transcript.
             segment_backend (`str`, defaults to `vad`):
                 Voice activity detection (VAD) engine to be used. Available options:
                 - `vad`: WebRTC Voice Activity Detector (VAD) engine (https://github.com/wiseman/py-webrtcvad).
@@ -137,6 +117,8 @@ class SubGenerator:
         if output_directory is None:
             warnings.warn(f"Output directory is None, using {self.temp_dir} instead.")
             output_directory = self.temp_dir
+        elif not os.path.exists(output_directory):
+            os.makedirs(output_directory)
 
         audio_file = AudioFile(temp_path)
         for format in sub_format:
@@ -166,7 +148,7 @@ class SubGenerator:
                 continue
             if tag == "music" and not transcribe_music:
                 if trans_dict is not None:
-                    final_tokens = self.post_process(trans_dict['tokens'])
+                    final_tokens = self.post_process(trans_dict['tokens'], auto_punc=auto_punc)
                     line_count = self.write_sub(
                         final_tokens,
                         line_count,
@@ -185,7 +167,7 @@ class SubGenerator:
                     or start - trans_dict.get('end', 0) > split_threshold_ms
                     or len(trans_dict['tokens']) > self.max_len
                 ):
-                    final_tokens = self.post_process(trans_dict['tokens'])
+                    final_tokens = self.post_process(trans_dict['tokens'], auto_punc=auto_punc)
                     line_count = self.write_sub(
                         final_tokens,
                         line_count,
@@ -212,7 +194,7 @@ class SubGenerator:
 
         # Handle last batch
         if trans_dict is not None:
-            final_tokens = self.post_process(trans_dict['tokens'])
+            final_tokens = self.post_process(trans_dict['tokens'], auto_punc=auto_punc)
             line_count = self.write_sub(
                 final_tokens,
                 line_count,
@@ -311,6 +293,7 @@ class SubGenerator:
         self,
         file_path,
         split_threshold_ms=200,
+        auto_punc=False,
         segment_backend='vad',
         classify_segment=False,
         show_progress=False,
@@ -373,7 +356,7 @@ class SubGenerator:
                 continue
             if tag == "music" and not transcribe_music:
                 if trans_dict is not None:
-                    final_tokens = self.post_process(trans_dict['tokens'])
+                    final_tokens = self.post_process(trans_dict['tokens'], auto_punc=auto_punc)
                     recognize_tokens.extend(final_tokens)
                     trans_dict = None
                 recognize_tokens.append(
@@ -392,7 +375,7 @@ class SubGenerator:
                     or start - trans_dict.get('end', 0) > split_threshold_ms
                     or len(trans_dict['tokens']) > self.max_len
                 ):
-                    final_tokens = self.post_process(trans_dict['tokens'])
+                    final_tokens = self.post_process(trans_dict['tokens'], auto_punc=auto_punc)
                     recognize_tokens.extend(final_tokens)
                     trans_dict = None
                 else:
