@@ -28,7 +28,6 @@ class AudioFile:
         self.audify_model = None
 
     def _ina_split(self, classify=True):
-        self.rewind()
         media_buffer = self.wav_file.readframes(self.wav_file.getnframes())
         media = pcm_to_np(media_buffer, self.audio_format).squeeze()
         segmenter = InaSegmenter.load()
@@ -73,9 +72,14 @@ class AudioFile:
                     tag = predict_tags[0]
 
             yield time_start, time_end, samples, tag
-
+    
     def split(self, aggressiveness=3, classify=True, backend='vad'):
-        if backend == "vad":
+        self.rewind()
+        if backend is None:
+            media_buffer = self.wav_file.readframes(self.wav_file.getnframes())
+            media = pcm_to_np(media_buffer, self.audio_format).squeeze()
+            yield 0, int(self.audio_length * 1000), media, "speech"
+        elif backend == "vad":
             return self._vad_split(aggressiveness, classify)
         elif backend == "ina":
             return self._ina_split(classify)

@@ -74,7 +74,7 @@ class InverseNormalizer(Normalizer):
         else:
             result = ""
             for i in range(0, len(tokens), chunk_size):
-                sub_text = " ".join(tokens[i, i + chunk_size])
+                sub_text = " ".join(tokens[i: i + chunk_size])
                 result += self.normalize(text=sub_text, verbose=verbose) + " "
             return result.strip()
 
