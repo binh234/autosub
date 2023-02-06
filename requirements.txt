@@ -3,7 +3,7 @@ argparse
 ffsubsync
 inaSpeechSegmenter
 jiwer
-numpy==1.19.5
+numpy==1.22.0
 overrides==4.1.2
 pyctcdecode==0.2.0
 pynini
