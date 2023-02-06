@@ -1,7 +1,5 @@
 allennlp==0.8.4
 argparse
-django
-faker
 ffsubsync
 inaSpeechSegmenter
 jiwer
@@ -11,8 +9,8 @@ pyctcdecode==0.2.0
 pynini
 python-Levenshtein==0.12.1
 scikit-learn==0.20.0
-torch>=1.10.0
-torchaudio>=0.10.0
+torch==1.10.0
+torchaudio==0.10.0
 transformers==4.15.0
 sentencepiece
 speechbrain==0.5.11
