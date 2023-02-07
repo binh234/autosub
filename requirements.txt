@@ -7,8 +7,8 @@ pyctcdecode==0.2.0
 pynini
 python-Levenshtein==0.12.2
 scikit-learn
-torch>=1.10.0
-torchaudio>=0.10.0
+torch==1.13.1
+torchaudio==0.13.1
 transformers==4.17.0
 sentencepiece
 speechbrain==0.5.11

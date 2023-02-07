@@ -60,6 +60,9 @@ class GecBERTModel(object):
                 Max iterations to run during inference.
             special_tokens_fix (`bool`, defaults to True):
                Whether to fix problem with [CLS], [SEP] tokens tokenization.
+            is_ensemble (`bool`, defaults to False):
+                Whether to do ensembling. Model must be stored in format {model_name}_{special_tokens_fix}.
+                Ex: `roberta_1.th`
             min_error_probability (`float`, defaults to `0.0`):
                 Minimum probability for each action to apply.
             confidence (`float`, defaults to `0.0`):
