@@ -38,10 +38,23 @@ class TelephoneFst(GraphFst):
         super().__init__(name="telephone", kind="classify")
         graph_zero = pynini.string_file(get_abs_path("data/numbers/zero.tsv"))
         graph_digit = pynini.string_file(get_abs_path("data/numbers/digit.tsv"))
+        graph_one = pynini.cross("mốt", "1")
+        graph_four = pynini.cross("tư", "4")
+        graph_five = pynini.cross("lăm", "5")
         digit = graph_digit | graph_zero
-        last_digit = digit | pynini.cross("mốt", "1") | pynini.cross("tư", "4") | pynini.cross("lăm", "5")
+        last_digit_exception = pynini.project(pynini.cross("năm", "5"), "input")
+        last_digit_with_exception = pynini.union(
+            (pynini.project(digit, "input") - last_digit_exception.arcsort()) @ digit,
+            graph_one,
+            graph_four,
+            graph_five,
+        )
+        last_digit = digit | graph_one | graph_four | graph_five
 
-        graph_number_part = pynini.closure(digit + delete_space, 2) + last_digit
+        graph_number_part = pynini.union(
+            pynini.closure(digit + delete_space, 2, 3) + last_digit_with_exception,
+            pynini.closure(digit + delete_space, 3) + last_digit,
+        )
         number_part = pynutil.insert('number_part: "') + graph_number_part + pynutil.insert('"')
 
         graph = number_part

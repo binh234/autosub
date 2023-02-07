@@ -67,7 +67,16 @@ class InverseNormalizer(Normalizer):
 
         Returns: written form
         """
-        return self.normalize(text=text, verbose=verbose)
+        chunk_size = 512
+        tokens = text.split()
+        if len(tokens) <= chunk_size:
+            return self.normalize(text=text, verbose=verbose)
+        else:
+            result = ""
+            for i in range(0, len(tokens), chunk_size):
+                sub_text = " ".join(tokens[i: i + chunk_size])
+                result += self.normalize(text=sub_text, verbose=verbose) + " "
+            return result.strip()
 
     def inverse_normalize_list_with_metadata(self, text_metas: List, verbose=False) -> List[str]:
         """

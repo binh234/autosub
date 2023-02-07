@@ -12,35 +12,11 @@ VIDEO_EXT = ['mp4', 'ogg', 'm4v', 'm4a', 'webm', 'flv', 'amv', 'avi']
 AUDIO_EXT = ['mp3', 'flac', 'wav', 'aac', 'm4a', 'weba', 'sdt']
 
 
-class FileGenObject(object):
-    def __init__(self, file_path, sub_format=['srt'], output_directory="./temp", temp_dir=DEFAULT_TEMP_DIR):
-        self.file_path = file_path
-        if temp_dir is None:
-            temp_dir = tempfile.mkdtemp()
-        self.temp_dir = temp_dir
-        self.temp_path = os.path.join(self.temp_dir, self.file_name + ".wav")
-
-        if self.file_ext in VIDEO_EXT:
-            self.is_video = True
-            extract_audio(self.file_path, self.temp_path)
-        elif self.file_ext in AUDIO_EXT:
-            self.is_video = False
-            convert_audio(self.file_path, self.temp_path)
-        else:
-            raise ValueError("Extension mismatch")
-
-        self.sub_format = sub_format
-        if output_directory is None:
-            output_directory = self.temp_dir
-        self.output_directory = output_directory
-        self.output_file_handle_dict = {}
-
-
 class SubGenerator:
     def __init__(
         self,
         asr_model,
-        normalizer,
+        normalizer=None,
         gector=None,
         src_lang='vi',
     ):
@@ -49,17 +25,18 @@ class SubGenerator:
         self.allow_tags = {"speech", "male", "female", "noisy_speech", "music"}
         self.src_lang = src_lang
         self.model = asr_model
-        self.itn = normalizer
+        self.normalizer = normalizer
         self.gector = gector
         if gector is not None:
             self.max_len = gector.max_len * 2
         else:
             self.max_len = 32
 
-    def post_process(self, tokens):
-        final_tokens = self.itn.inverse_normalize_with_metadata(tokens, verbose=False)
+    def post_process(self, tokens, auto_punc=True):
+        if self.normalizer:
+            final_tokens = self.normalizer.inverse_normalize_with_metadata(tokens, verbose=False)
         if self.gector:
-            final_batch, _ = self.gector.handle_batch_with_metadata([final_tokens])
+            final_batch, _ = self.gector.handle_batch_with_metadata([final_tokens], add_punc=auto_punc)
             final_tokens = final_batch[0]
 
         return final_tokens
@@ -73,6 +50,7 @@ class SubGenerator:
         max_words=12,
         sub_format=['srt'],
         output_directory="./temp",
+        auto_punc=True,
         segment_backend='vad',
         classify_segment=False,
         show_progress=False,
@@ -94,6 +72,8 @@ class SubGenerator:
                 Subtitle format to generate, available formats are txt, srt, and vtt
             output_directory (`str`, defaults to `./temp`):
                 Output directory to store subtitle files.
+            auto_punc (`bool`, defaults to True):
+                Whether to auto punctuation for transcript.
             segment_backend (`str`, defaults to `vad`):
                 Voice activity detection (VAD) engine to be used. Available options:
                 - `vad`: WebRTC Voice Activity Detector (VAD) engine (https://github.com/wiseman/py-webrtcvad).
@@ -109,17 +89,19 @@ class SubGenerator:
             transcribe_music (`bool`, defaults to False):
                 Whether to transcribe music segments. Only relevant
                 if `segment_backend is ina` or `classify_segment is True`.
+        Returns:
+            List of output filenames.
         """
 
         if not os.path.exists(file_path):
             raise ValueError("File does not exist: %s" % file_path)
 
-        if classify_segment and segment_backend == 'vad':
+        if not transcribe_music and classify_segment and segment_backend == 'vad':
             warnings.warn(
-                "Classify segment should be used with ina backend, otherwise the transcript quality might be downgraded"
+                "When using `vad` backend, you should set `classify_segment=True and transcribe_music=True`, otherwise the transcript quality might be downgraded"
             )
 
-        file_name, file_ext = os.path.split(file_path)[-1].split(".")
+        file_name, file_ext = os.path.split(file_path)[-1].rsplit(".", 1)
         file_id = uuid.uuid4().hex
         temp_path = os.path.join(self.temp_dir, file_id + ".wav")
         output_file_handle_dict = {}
@@ -135,6 +117,8 @@ class SubGenerator:
         if output_directory is None:
             warnings.warn(f"Output directory is None, using {self.temp_dir} instead.")
             output_directory = self.temp_dir
+        elif not os.path.exists(output_directory):
+            os.makedirs(output_directory)
 
         audio_file = AudioFile(temp_path)
         for format in sub_format:
@@ -164,11 +148,9 @@ class SubGenerator:
                 continue
             if tag == "music" and not transcribe_music:
                 if trans_dict is not None:
-                    final_tokens = self.post_process(trans_dict['tokens'])
+                    final_tokens = self.post_process(trans_dict['tokens'], auto_punc=auto_punc)
                     line_count = self.write_sub(
                         final_tokens,
-                        trans_dict['start'],
-                        trans_dict['end'],
                         line_count,
                         trans_dict['split_times'],
                         **subtitle_kwargs,
@@ -185,11 +167,9 @@ class SubGenerator:
                     or start - trans_dict.get('end', 0) > split_threshold_ms
                     or len(trans_dict['tokens']) > self.max_len
                 ):
-                    final_tokens = self.post_process(trans_dict['tokens'])
+                    final_tokens = self.post_process(trans_dict['tokens'], auto_punc=auto_punc)
                     line_count = self.write_sub(
                         final_tokens,
-                        trans_dict['start'],
-                        trans_dict['end'],
                         line_count,
                         trans_dict['split_times'],
                         **subtitle_kwargs,
@@ -214,11 +194,9 @@ class SubGenerator:
 
         # Handle last batch
         if trans_dict is not None:
-            final_tokens = self.post_process(trans_dict['tokens'])
+            final_tokens = self.post_process(trans_dict['tokens'], auto_punc=auto_punc)
             line_count = self.write_sub(
                 final_tokens,
-                trans_dict['start'],
-                trans_dict['end'],
                 line_count,
                 trans_dict['split_times'],
                 **subtitle_kwargs,
@@ -238,8 +216,6 @@ class SubGenerator:
     def write_sub(
         self,
         tokens,
-        start,
-        end,
         line_count,
         split_times=[],
         output_file_handle_dict={},
@@ -313,6 +289,126 @@ class SubGenerator:
 
         return line_count
 
+    def recognize(
+        self,
+        file_path,
+        split_threshold_ms=200,
+        auto_punc=False,
+        segment_backend='vad',
+        classify_segment=False,
+        show_progress=False,
+        transcribe_music=False,
+    ):
+        r"""
+        Args:
+            file_path (`str`):
+                Path to video/audio file to be transcribed.
+            split_threshold_ms (`int`, defaults to 200):
+                In the end of each speech chunk wait for split_threshold_ms (in milliseconds) before separating it.
+            segment_backend (`str`, defaults to `vad`):
+                Voice activity detection (VAD) engine to be used. Available options:
+                - `vad`: WebRTC Voice Activity Detector (VAD) engine (https://github.com/wiseman/py-webrtcvad).
+                    Fast, shorter segments, decent accuracy (Usually captures noise as speech)
+                - `ina`: inaSpeechSegmenter engine (https://github.com/ina-foss/inaSpeechSegmenter).
+                    Robust to noise, higher accuracy, longer segments but takes more time for segmentation.
+                - None: Do not use VAD to split audio file.
+            classify_segment (`bool`, defaults to False):
+                Whether to classify segments generated by VAD engine to multiple classes (speech, music, noise, etc).
+                Since this module is trained on limited resources, it may misclassify speech and speech over noise or music.
+                This module can be used to boost accuracy for `ina` backend, but not recommended for `vad`.
+            show_progress (`bool`, defaults to False):
+                Whether to show progress bar on terminal.
+            transcribe_music (`bool`, defaults to False):
+                Whether to transcribe music segments. Only relevant
+                if `segment_backend is ina` or `classify_segment is True`.
+        Returns:
+            List of tokens with start and end timestamp.
+        """
+
+        if not os.path.exists(file_path):
+            raise ValueError("File does not exist: %s" % file_path)
+
+        if not transcribe_music and classify_segment and segment_backend == 'vad':
+            warnings.warn(
+                "When using `vad` backend, you should set `classify_segment=True and transcribe_music=True`, otherwise the transcript quality might be downgraded"
+            )
+
+        _, file_ext = os.path.split(file_path)[-1].rsplit(".", 1)
+        file_id = uuid.uuid4().hex
+        temp_path = os.path.join(self.temp_dir, file_id + ".wav")
+
+        if file_ext in VIDEO_EXT:
+            extract_audio(file_path, temp_path)
+        elif file_ext in AUDIO_EXT:
+            convert_audio(file_path, temp_path)
+        else:
+            raise ValueError(f"Extension mismatch, should be one of {AUDIO_EXT + VIDEO_EXT}")
+
+        audio_file = AudioFile(temp_path)
+
+        if show_progress:
+            progress_bar = tqdm.tqdm(total=int(audio_file.audio_length * 1000))
+
+        last = 0
+        trans_dict = None
+        recognize_tokens = []
+        for (start, end, audio, tag) in audio_file.split(backend=segment_backend, classify=classify_segment):
+            if tag not in self.allow_tags:
+                continue
+            if tag == "music" and not transcribe_music:
+                if trans_dict is not None:
+                    final_tokens = self.post_process(trans_dict['tokens'], auto_punc=auto_punc)
+                    recognize_tokens.extend(final_tokens)
+                    trans_dict = None
+                recognize_tokens.append(
+                    {
+                        "text": "[âm nhạc]",
+                        "start": start,
+                        "end": end,
+                    }
+                )
+                continue
+
+            _, tokens, _ = self.model.transcribe_with_metadata(audio, start)[0]
+            if trans_dict is not None:
+                if (
+                    len(tokens) == 0
+                    or start - trans_dict.get('end', 0) > split_threshold_ms
+                    or len(trans_dict['tokens']) > self.max_len
+                ):
+                    final_tokens = self.post_process(trans_dict['tokens'], auto_punc=auto_punc)
+                    recognize_tokens.extend(final_tokens)
+                    trans_dict = None
+                else:
+                    trans_dict['tokens'].extend(tokens)
+                    trans_dict['split_times'].append(trans_dict['end'])
+                    trans_dict['end'] = end
+
+            if trans_dict is None:
+                trans_dict = {
+                    'tokens': tokens,
+                    'start': start,
+                    'end': end,
+                    'split_times': [],
+                }
+
+            if show_progress:
+                progress_bar.update(int(end - last))
+            last = end
+
+        # Handle last batch
+        if trans_dict is not None:
+            final_tokens = self.post_process(trans_dict['tokens'])
+            recognize_tokens.extend(final_tokens)
+        if show_progress:
+            progress_bar.update(int(progress_bar.total - last))
+        audio_file.close()
+
+        if os.path.exists(temp_path):
+            os.remove(temp_path)
+
+        return recognize_tokens
+
     def sync_sub(self, file_path, subtitle_path, output_path=None):
         _, sub_ext = os.path.splitext(subtitle_path)
         if sub_ext != ".srt":
@@ -335,8 +431,8 @@ class SubGenerator:
         if output_path is None or output_path == subtitle_path:
             output_path = file_name + "_sub" + file_ext
             overwrite = True
-        if file_ext not in VIDEO_EXT:
-            raise ValueError(f"Only supported for videoof format {VIDEO_EXT}")
+        if file_ext[1:] not in VIDEO_EXT:
+            raise ValueError(f"Only supported for video format: {VIDEO_EXT}")
         cmd = f"ffmpeg -loglevel quiet -i {file_path} -i {subtitle_path} -y -c copy -c:s mov_text {output_path}"
         os.system(cmd)
 

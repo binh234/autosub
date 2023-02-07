@@ -12,23 +12,22 @@ segment_backend = "vad"
 normalizer = InverseNormalizer("vi")
 
 print(normalizer.inverse_normalize("ngày ba mươi tháng tư năm hai không hai mốt", verbose=True))
+print(normalizer.inverse_normalize("năm sáu triệu", verbose=True))
+print(normalizer.inverse_normalize("năm trăm sáu mươi triệu", verbose=True))
 
 # model = HuggingFaceASRModel("pretrain/base", lm_path, vocab_path, cache_dir=cache_dir)
 model = SpeechbrainASRModel("pretrain/base", lm_path, vocab_path, cache_dir=cache_dir)
 gector = GecBERTModel(
-    vocab_path="pretrain/phobert/vocabulary",
-    model_paths=["pretrain/phobert/model.th"],
+    vocab_path="pretrain/vibert/vocabulary",
+    model_paths=["pretrain/vibert"],
     device=None,
     max_len=64,
     min_len=3,
     iterations=3,
     min_error_probability=0.2,
     lowercase_tokens=False,
-    model_name='vinai/phobert-base',
-    special_tokens_fix=1,
     log=False,
     confidence=0,
-    is_ensemble=False,
     weights=None,
     split_chunk=True,
     chunk_size=48,
@@ -36,10 +35,18 @@ gector = GecBERTModel(
     min_words_cut=8,
 )
 
+# Recomend_parameters
+# (segment_backend='vad', classify_segment=False)
+# (segment_backend='vad', classify_segment=True, transcribe_music=True)
+# # `Ina` backend may misclassify for speech over noise segments (accuracy around 94%)
+# (segment_backend='ina', classify_segment=True, transcribe_music=True)
+# # a bit downgrade in quality for audios that have many `speech over music` segments like films or gameshows
+# (segment_backend='ina', classify_segment=True, transcribe_music=False)
 gen = SubGenerator(model, normalizer, gector=gector)
 subtitle_paths = gen.create_sub(
     file_path,
     sub_format=["srt"],
+    auto_punc=True,
     segment_backend="vad",
     classify_segment=True,
     show_progress=True,
@@ -49,7 +56,3 @@ print(subtitle_paths)
 srt_path = subtitle_paths[0]
 gen.sync_sub(file_path, srt_path)
 gen.add_sub_to_video(file_path, srt_path)
-
-# gen = SubGenerator("sample/snews.mp4", model, gector, normalizer)
-# gen.create_sub()
-# gen.sync_sub()

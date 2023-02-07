@@ -7,7 +7,6 @@ import torch
 import numpy as np
 import time
 import tqdm
-from multiprocessing import Pool
 import warnings
 
 from asr.audio import AudioFile
@@ -19,9 +18,6 @@ STRIDES = 20
 
 
 class BaseASRModel(torch.nn.Module):
-    def __init__(self, *args, **kwargs):
-        super(BaseASRModel, self).__init__()
-
     def build_lm(self, tokenizer, vocab_path=None):
         unigrams = None
         if vocab_path is not None:
@@ -299,6 +295,7 @@ class SpeechbrainASRModel(BaseASRModel):
             context_size (`float`, defaults to 2.5):
                 Context length (in seconds) to added in each audio chunk for smoother recognition.
             hot_words (List[str], *Optional*):
+                Improve domain specificity by adding important contextual words ("hotwords") during inference.
         """
         super(SpeechbrainASRModel, self).__init__()
         self.model_path = model_path

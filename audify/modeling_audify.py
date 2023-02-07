@@ -31,7 +31,7 @@ class AudifyModel(torch.nn.Module):
         In some instances you may want to load the same model twice
         This factory provides a cache so that you don't actually have to load the model twice.
         """
-        if model_path not in cls._cache:
+        if model_path in cls._cache:
             return cls._cache[model_path]
 
         model = AudifyModel(model_path, save_path)
